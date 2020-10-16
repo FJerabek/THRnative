@@ -2,40 +2,41 @@
 
 package cz.fjerabek.thr
 
-import bluez.register_rfcomm_sdp
-import com.badoo.reaktive.observable.*
+import com.badoo.reaktive.observable.observable
+import com.badoo.reaktive.observable.observeOn
+import com.badoo.reaktive.observable.subscribe
+import com.badoo.reaktive.observable.subscribeOn
 import com.badoo.reaktive.scheduler.ioScheduler
 import cz.fjerabek.thr.bluetooth.Bluetooth
 import cz.fjerabek.thr.bluetooth.BluetoothConnection
 import cz.fjerabek.thr.controls.Compressor
 import cz.fjerabek.thr.controls.Effect
-import cz.fjerabek.thr.controls.MainPanel
 import cz.fjerabek.thr.controls.Reverb
 import cz.fjerabek.thr.controls.compressor.Rack
 import cz.fjerabek.thr.controls.compressor.Stomp
-import cz.fjerabek.thr.controls.effect.*
-import cz.fjerabek.thr.controls.reverb.*
-import cz.fjerabek.thr.enums.mainpanel.EAmpType
-import cz.fjerabek.thr.enums.mainpanel.ECabinetType
+import cz.fjerabek.thr.controls.effect.Chorus
+import cz.fjerabek.thr.controls.effect.Flanger
+import cz.fjerabek.thr.controls.effect.Phaser
+import cz.fjerabek.thr.controls.effect.Tremolo
+import cz.fjerabek.thr.controls.reverb.Hall
+import cz.fjerabek.thr.controls.reverb.Plate
+import cz.fjerabek.thr.controls.reverb.Room
+import cz.fjerabek.thr.controls.reverb.Spring
 import cz.fjerabek.thr.midi.Midi
-import cz.fjerabek.thr.midi.messages.*
+import cz.fjerabek.thr.midi.messages.ChangeMessage
+import cz.fjerabek.thr.midi.messages.DumpMessage
+import cz.fjerabek.thr.midi.messages.HeartBeatMessage
+import cz.fjerabek.thr.midi.messages.IMidiMessage
+import cz.fjerabek.thr.uart.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.PolymorphicSerializer
-import kotlinx.serialization.StringFormat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
-import kotlin.native.concurrent.ThreadLocal
-import org.kodein.di.DI
-import org.kodein.di.bind
-import org.kodein.di.instance
-import org.kodein.di.singleton
-import platform.posix.pread
-import platform.posix.random
 import platform.posix.sleep
-import kotlin.native.concurrent.AtomicInt
 import kotlin.native.concurrent.AtomicReference
+import kotlin.native.concurrent.ThreadLocal
 
 
 @ThreadLocal
@@ -66,23 +67,18 @@ val serializerModule = SerializersModule {
     }
 }
 
-@ThreadLocal
-val di = DI {
-   bind<StringFormat>() with singleton {  Json {
-       serializersModule = serializerModule
-       prettyPrint = true
-   }}
-}
-
 @ExperimentalUnsignedTypes
 fun ByteArray.toHexString() = asUByteArray().joinToString(" ") { it.toString(16).padStart(2, '0') }
 
 @ThreadLocal
-val serializer by di.instance<StringFormat>()
+val serializer = Json {
+    serializersModule = serializerModule
+    prettyPrint = true
+}
 
 @ExperimentalUnsignedTypes
 @SharedImmutable
-val bluetoothConnection: AtomicReference<BluetoothConnection?>? = AtomicReference(null)
+val bluetoothConnection: AtomicReference<BluetoothConnection?> = AtomicReference(null)
 
 @ExperimentalSerializationApi
 @ExperimentalUnsignedTypes
@@ -113,16 +109,23 @@ fun main(args: Array<String>) {
 //        bluetoothConnection?.value = it
 //    }
 //
-//    while (true) {
-//        sleep(5)
-//    }
 //    Uart.startReceiver().subscribeOn(ioScheduler).subscribe {
-//        println(it)
+//        when(it) {
+//            is ButtonMessage -> println(it)
+//            is FWVersionMessage -> println(it)
+//            is StatusMessage -> println(it)
+//            is ShutdownMessage -> println(it)
+//        }
 //    }
 
+
+
     while (true) {
-        Uart.requestShutdown()
         sleep(2)
+//        println("REQUEST")
+//        Uart.requestStatus()
+//        Uart.requestFirmware()
     }
+
 }
 

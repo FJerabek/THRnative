@@ -2,17 +2,14 @@
 <module version="4">
   <component name="FacetManager">
     <facet type="kotlin-language" name="Kotlin">
-      <configuration version="3" platform="Native (linux_x64) " allPlatforms="Native []/Native [linux_x64]" useProjectSettings="false" isTestModule="true" externalProjectId="THR-native">
+      <configuration version="3" platform="Native (linux_arm32_hfp) " allPlatforms="Native []/Native [linux_arm32_hfp]" useProjectSettings="false" isTestModule="true" externalProjectId="THR-native">
         <dependsOnModuleNames>THR-native:commonTest</dependsOnModuleNames>
         <sourceSets>
+          <sourceSet>THR-native.commonMain</sourceSet>
           <sourceSet>THR-native.nativeMain</sourceSet>
           <sourceSet>THR-native.commonTest</sourceSet>
-          <sourceSet>THR-native.commonMain</sourceSet>
         </sourceSets>
         <newMppModelJpsModuleKind>COMPILATION_AND_SOURCE_SET_HOLDER</newMppModelJpsModuleKind>
-        <externalSystemTestTasks>
-          <externalSystemTestTask>nativeTest|THR-native:nativeTest|native</externalSystemTestTask>
-        </externalSystemTestTasks>
         <compilerSettings />
         <compilerArguments>
           <option name="languageVersion" value="1.4" />

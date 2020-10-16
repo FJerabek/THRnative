@@ -18,14 +18,14 @@ kotlin {
     val isMingwX64 = hostOs.startsWith("Windows")
     val nativeTarget = when {
         hostOs == "Mac OS X" -> macosX64("native")
-//        hostOs == "Linux" -> linuxArm32Hfp("native") {
-//            val main by compilations.getting
-//            val bluez by main.cinterops.creating
-//        }
-        hostOs == "Linux" -> linuxX64("native") {
+        hostOs == "Linux" -> linuxArm32Hfp("native") {
             val main by compilations.getting
             val bluez by main.cinterops.creating
         }
+//        hostOs == "Linux" -> linuxX64("native") {
+//            val main by compilations.getting
+//            val bluez by main.cinterops.creating
+//        }
         isMingwX64 -> mingwX64("native")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }
@@ -41,14 +41,9 @@ kotlin {
         val nativeMain by getting {
             dependencies {
                 implementation(kotlin("stdlib", org.jetbrains.kotlin.config.KotlinCompilerVersion.VERSION))
-//                implementation( "co.touchlab:stately-common:1.1.0")
-//                implementation("co.touchlab:stately-concurrency:1.1.0")
-//                implementation("co.touchlab:stately-isolate:1.1.1-a1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.0-RC")
-//                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.0-RC")
-                implementation("org.kodein.di:kodein-di:7.1.0")
+//                implementation("org.kodein.di:kodein-di:7.1.0")
                 implementation("com.badoo.reaktive:reaktive:1.1.17")
-//                implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:+")
 
             }
         }

@@ -4,10 +4,6 @@
     <facet type="kotlin-language" name="Kotlin">
       <configuration version="3" platform="Common (experimental) " allPlatforms="JS []/JVM [1.6]/Native []/Native [general]" useProjectSettings="false" isTestModule="false" externalProjectId="THR-native">
         <newMppModelJpsModuleKind>SOURCE_SET_HOLDER</newMppModelJpsModuleKind>
-        <externalSystemTestTasks>
-          <externalSystemNativeMainRunTask>runDebugExecutableNative|THR-native:nativeMain|native|cz.fjerabek.thr.main|true</externalSystemNativeMainRunTask>
-          <externalSystemNativeMainRunTask>runReleaseExecutableNative|THR-native:nativeMain|native|cz.fjerabek.thr.main|false</externalSystemNativeMainRunTask>
-        </externalSystemTestTasks>
         <compilerSettings />
         <compilerArguments>
           <option name="languageVersion" value="1.4" />

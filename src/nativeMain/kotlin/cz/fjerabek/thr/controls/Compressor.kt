@@ -24,8 +24,6 @@ abstract class Compressor(
 
     companion object {
         fun fromDump(dump : ByteArray) : Compressor {
-            val status = EStatus.fromValue(dump[ECompressor.STATUS.dumpPosition])!!
-
             return when(ECompressorType.fromId(dump[ECompressor.TYPE.dumpPosition])!!){
                 ECompressorType.STOMP -> Stomp(dump)
                 ECompressorType.RACK -> Rack(dump)
