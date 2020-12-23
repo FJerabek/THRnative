@@ -1,19 +1,4 @@
-headers = /usr/include/bluetooth/bluetooth.h \
-/usr/include/bluetooth/hci.h \
-/usr/include/bluetooth/hci_lib.h \
-/usr/include/bluetooth/rfcomm.h \
-/usr/include/bluetooth/sdp.h \
-/usr/include/bluetooth/sdp_lib.h
-
-headerFilter = /usr/include/bluetooth/*
-
-compilerOpts.linux = -I/usr/include
-#linkerOpts.linux = -L /home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/bluetooth_armhf -lbluetooth
-linkerOpts.linux = -L /usr/lib/x86_64-linux-gnu -lbluetooth
-
-#FIXME: Remove uart setup from bluetooth def file
----
-
+#include "bluetooth_utils.h"
 sdp_session_t* register_rfcomm_sdp(uint8_t rfcomm_channel, char* service_name, char* service_dsc, char* service_prov) {
     uint32_t service_uuid_int[] = { 0x01110000, 0x00100000, 0x80000080, 0xfb349b5f};
 
@@ -88,7 +73,6 @@ sdp_session_t* register_rfcomm_sdp(uint8_t rfcomm_channel, char* service_name, c
 
     return session;
 }
-#include <termios.h>
 
 void setupSerial(int fd) {
     struct termios options;

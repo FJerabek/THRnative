@@ -1,6 +1,10 @@
 package cz.fjerabek.thr.uart
 
-abstract class UartMessage {
+import cz.fjerabek.thr.bluetooth.IBluetoothMessage
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+abstract class UartMessage: IBluetoothMessage {
     companion object {
         fun fromString(string: String): UartMessage {
             val params = string.split(";")
@@ -44,18 +48,23 @@ abstract class UartMessage {
     }
 }
 
+@Serializable
 data class ButtonMessage(
     var id : Int,
     var pressed : Boolean,
     var pressedTime : Long
 ): UartMessage()
 
+@Serializable
+@SerialName("FwVersion")
 data class FWVersionMessage(
     var major : Int,
     var minor : Int,
     var patch : Int
 ): UartMessage()
 
+@Serializable
+@SerialName("HwStatus")
 data class StatusMessage(
     var uptime : Long,
     var battery : Int,
@@ -63,6 +72,7 @@ data class StatusMessage(
     var current : Int
 ) : UartMessage()
 
+@Serializable
 data class ShutdownMessage(
     val ok: Boolean
 ) : UartMessage()

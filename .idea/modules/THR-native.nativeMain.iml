@@ -2,7 +2,7 @@
 <module version="4">
   <component name="FacetManager">
     <facet type="kotlin-language" name="Kotlin">
-      <configuration version="3" platform="Native (linux_arm32_hfp) " allPlatforms="Native []/Native [linux_arm32_hfp]" useProjectSettings="false" isTestModule="false" externalProjectId="THR-native">
+      <configuration version="3" platform="Native " allPlatforms="Native []" useProjectSettings="false" isTestModule="false" externalProjectId="THR-native">
         <dependsOnModuleNames>THR-native:commonMain</dependsOnModuleNames>
         <sourceSets>
           <sourceSet>THR-native.commonMain</sourceSet>

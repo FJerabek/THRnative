@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.support.compileKotlinScriptModuleTo
+
 plugins {
     kotlin("multiplatform") version "1.4.10"
     kotlin("plugin.serialization") version "1.4.10"
@@ -12,28 +14,37 @@ repositories {
         url = uri("https://dl.bintray.com/badoo/maven")
     }
 }
+
 kotlin {
-    val targetOs = System.getProperty("target")
     val hostOs = System.getProperty("os.name")
-    val isMingwX64 = hostOs.startsWith("Windows")
     val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
-        hostOs == "Linux" -> linuxArm32Hfp("native") {
+        hostOs == "Linux" && project.hasProperty("rpi") -> linuxArm32Hfp("native") {
             val main by compilations.getting
             val bluez by main.cinterops.creating
         }
-//        hostOs == "Linux" -> linuxX64("native") {
-//            val main by compilations.getting
-//            val bluez by main.cinterops.creating
-//        }
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+        hostOs == "Linux" -> linuxX64("native") {
+            val main by compilations.getting
+            val bluez by main.cinterops.creating
+        }
+        else -> throw GradleException("Host OS is not supported")
     }
 
     nativeTarget.apply {
         binaries {
             executable {
                 entryPoint = "cz.fjerabek.thr.main"
+                when {
+//                    hostOs == "Linux" && project.hasProperty("rpi") -> {
+//                        linkerOpts = mutableListOf(
+//                            "-L ${rootProject.projectDir}/src/nativeInterop/bluetooth_armhf -lbluetooth"
+//                        )
+//                    }
+                    hostOs == "Linux" -> {
+                        linkerOpts = mutableListOf(
+                            "-L /usr/lib/x86_64-linux-gnu -lbluetooth"
+                        )
+                    }
+                }
             }
         }
     }
