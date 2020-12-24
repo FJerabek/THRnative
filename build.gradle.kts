@@ -1,10 +1,10 @@
 import org.gradle.kotlin.dsl.support.compileKotlinScriptModuleTo
 
 plugins {
-    kotlin("multiplatform") version "1.4.10"
-    kotlin("plugin.serialization") version "1.4.10"
+    kotlin("multiplatform") version "1.4.21"
+    kotlin("plugin.serialization") version "1.4.21"
 }
-group = "me.fjerabek"
+group = "cz.fjerabek"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -33,18 +33,6 @@ kotlin {
         binaries {
             executable {
                 entryPoint = "cz.fjerabek.thr.main"
-                when {
-//                    hostOs == "Linux" && project.hasProperty("rpi") -> {
-//                        linkerOpts = mutableListOf(
-//                            "-L ${rootProject.projectDir}/src/nativeInterop/bluetooth_armhf -lbluetooth"
-//                        )
-//                    }
-                    hostOs == "Linux" -> {
-                        linkerOpts = mutableListOf(
-                            "-L /usr/lib/x86_64-linux-gnu -lbluetooth"
-                        )
-                    }
-                }
             }
         }
     }

@@ -4,17 +4,17 @@ import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
-import platform.posix.close
-import platform.posix.read
-import platform.posix.write
 import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.ioScheduler
+import cz.fjerabek.thr.LogUtils
 import cz.fjerabek.thr.LogUtils.debug
+import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.serializer
 import kotlinx.serialization.PolymorphicSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
-import platform.posix.sockaddr
+import platform.posix.*
 
 @ExperimentalUnsignedTypes
 class BluetoothConnection(
@@ -36,15 +36,19 @@ class BluetoothConnection(
     }
 
     fun startReceiver() = observable<IBluetoothMessage> {
-        kotlin.runCatching {
-            while (true) {
-                //Fixme: On error message receiver is stopped.
-                it.onNext(
-                    serializer.decodeFromString(
-                        PolymorphicSerializer(IBluetoothMessage::class),
-                        readString()
-                    )
+        "Starting receiver".debug()
+        while (true) {
+            try {
+                val stringMessage = readString()
+                "Received: $stringMessage".debug()
+                val message = serializer.decodeFromString(
+                    PolymorphicSerializer(IBluetoothMessage::class),
+                    stringMessage
                 )
+                debug { message }
+                it.onNext(message)
+            } catch (e: SerializationException) {
+                "Received unserializable message".warn()
             }
         }
     }.observeOn(ioScheduler)

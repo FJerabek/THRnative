@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 @SerialName("Dump")
-class DumpMessage(
+class PresetMessage(
         var name : String,
         var mainPanel: MainPanel,
         var compressor: Compressor? = null,
