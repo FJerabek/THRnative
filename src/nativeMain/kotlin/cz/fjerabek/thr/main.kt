@@ -15,94 +15,19 @@ import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.LogUtils.info
 import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.bluetooth.*
-import cz.fjerabek.thr.controls.Compressor
-import cz.fjerabek.thr.controls.Effect
-import cz.fjerabek.thr.controls.Reverb
-import cz.fjerabek.thr.controls.compressor.Rack
-import cz.fjerabek.thr.controls.compressor.Stomp
-import cz.fjerabek.thr.controls.effect.Chorus
-import cz.fjerabek.thr.controls.effect.Flanger
-import cz.fjerabek.thr.controls.effect.Phaser
-import cz.fjerabek.thr.controls.effect.Tremolo
-import cz.fjerabek.thr.controls.reverb.Hall
-import cz.fjerabek.thr.controls.reverb.Plate
-import cz.fjerabek.thr.controls.reverb.Room
-import cz.fjerabek.thr.controls.reverb.Spring
 import cz.fjerabek.thr.file.PresetsManager
 import cz.fjerabek.thr.midi.Midi
 import cz.fjerabek.thr.midi.MidiDisconnectedException
 import cz.fjerabek.thr.midi.MidiUnknownMessageException
 import cz.fjerabek.thr.midi.messages.ChangeMessage
-import cz.fjerabek.thr.midi.messages.PresetMessage
 import cz.fjerabek.thr.midi.messages.HeartBeatMessage
 import cz.fjerabek.thr.midi.messages.IMidiMessage
+import cz.fjerabek.thr.midi.messages.PresetMessage
 import cz.fjerabek.thr.uart.*
-import kotlinx.cinterop.toKString
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
-import platform.posix.errno
 import platform.posix.sleep
-import platform.posix.strerror
+import kotlin.native.concurrent.AtomicInt
 import kotlin.native.concurrent.SharedImmutable
-import kotlin.native.concurrent.ThreadLocal
-
-
-@ThreadLocal
-val serializerModule = SerializersModule {
-    polymorphic(Effect::class) {
-        subclass(Chorus::class)
-        subclass(Flanger::class)
-        subclass(Phaser::class)
-        subclass(Tremolo::class)
-    }
-
-    polymorphic(Compressor::class) {
-        subclass(Rack::class)
-        subclass(Stomp::class)
-    }
-
-    polymorphic(Reverb::class) {
-        subclass(Hall::class)
-        subclass(Plate::class)
-        subclass(Room::class)
-        subclass(Spring::class)
-    }
-
-    polymorphic(IMidiMessage::class) {
-        subclass(HeartBeatMessage::class)
-        subclass(PresetMessage::class)
-        subclass(ChangeMessage::class)
-    }
-
-    polymorphic(UartMessage::class) {
-        subclass(ButtonMessage::class)
-        subclass(FWVersionMessage::class)
-        subclass(StatusMessage::class)
-        subclass(ShutdownMessage::class)
-    }
-
-    polymorphic(IBluetoothMessage::class) {
-        subclass(ButtonMessage::class)
-        subclass(FWVersionMessage::class)
-        subclass(StatusMessage::class)
-        subclass(ShutdownMessage::class)
-        subclass(HeartBeatMessage::class)
-        subclass(PresetMessage::class)
-        subclass(ChangeMessage::class)
-
-        subclass(HwStatusRq::class)
-        subclass(FwVersionRq::class)
-    }
-}
-
-@ThreadLocal
-val serializer = Json {
-    serializersModule = serializerModule
-    prettyPrint = true
-}
 
 @SharedImmutable
 val midi = AtomicReference<Midi?>(null)
@@ -112,14 +37,19 @@ val midi = AtomicReference<Midi?>(null)
 val bluetoothConnection: AtomicReference<BluetoothConnection?> = AtomicReference(null)
 
 @SharedImmutable
-val presets = AtomicReference<MutableList<PresetMessage>>(mutableListOf())
+val presets = AtomicReference<List<PresetMessage>>(listOf())
 
 @SharedImmutable
 val midiPort = AtomicReference("/dev/midi3")
 
+@SharedImmutable
+val presetsFilePath = AtomicReference("presets.json")
+
+@SharedImmutable
+val currentPreset = AtomicInt(-1)
+
 @ExperimentalUnsignedTypes
 fun ByteArray.toHexString() = asUByteArray().joinToString(" ") { it.toString(16).padStart(2, '0') }
-
 
 /**
  * Called on midi message receive
@@ -127,15 +57,19 @@ fun ByteArray.toHexString() = asUByteArray().joinToString(" ") { it.toString(16)
 @ExperimentalUnsignedTypes
 fun onMidiMessage(message: IMidiMessage) {
     if (message is HeartBeatMessage) return
-    if (message is PresetMessage)
+    if (message is ChangeMessage && currentPreset.value != -1) {
+        currentPreset.value = -1
         bluetoothConnection.value?.run {
-            try {
-                sendMessage(message)
-            } catch (e: BluetoothConnectionClosedException) {
-                // Trying to write to closed bluetooth connection
-                bluetoothError(e)
-            }
+            sendMessage(PresetSelect(-1))
         }
+    }
+    bluetoothConnection.value?.run {
+        try {
+            sendMessage(message)
+        } catch (e: BluetoothConnectionClosedException) {
+            bluetoothError(e)
+        }
+    }
 }
 
 /**
@@ -148,11 +82,9 @@ fun onMidiError(throwable: Throwable) {
             midi.value?.close()
             midiConnect(midiPort.value)
         }
-        is MidiUnknownMessageException -> "MIDI Received unknown message".warn()
         else -> "Midi error ${throwable.stackTraceToString()}".error()
     }
 }
-
 /**
  * Starts connecting to THR midi device. Blocks current thread if not connected
  */
@@ -188,13 +120,41 @@ fun bluetoothError(e: Throwable) {
 fun bluetoothMessage(message: IBluetoothMessage) {
     "Bluetooth received: $message".debug()
     when (message) {
-        is FwVersionRq -> {
-            Uart.requestFirmware()
+        is IMidiMessage -> midi.value?.sendMessage(message)
+        is FwVersionRq -> Uart.requestFirmware()
+        is HwStatusRq ->  Uart.requestStatus()
+        is PresetsRq -> bluetoothConnection.value?.sendMessage(PresetsResponse(presets.value))
+        is CurrentPresetRq -> midi.value?.requestDump()
+        is RemovePresetRq -> {
+            if(message.index >= presets.value.size) {
+                "Invalid preset index: ${message.index} preset size: ${presets.value.size}".error()
+            } else {
+                presets.update {
+                    it.filterIndexed { index, _ -> index != message.index }
+                }
+                PresetsManager.savePresets(presetsFilePath.value, presets.value)
+            }
         }
-        is HwStatusRq -> {
-            Uart.requestStatus()
+        is AddPresetRq -> {
+            presets.update {
+                it.toMutableList().run{
+                    add(message.preset)
+                    this
+                }
+            }
+            PresetsManager.savePresets(presetsFilePath.value, presets.value)
         }
-        //Todo: Add more bluetooth request messages
+        is SetPresetsRq -> {
+            presets.value = message.presets.toMutableList()
+            PresetsManager.savePresets(presetsFilePath.value, presets.value)
+        }
+        is PresetSelect -> {
+            if(message.index >= presets.value.size) {
+                "Invalid preset index: ${message.index} preset size: ${presets.value.size}".error()
+            } else {
+                midi.value?.sendMessage(presets.value[message.index])
+            }
+        }
     }
 }
 
@@ -262,7 +222,7 @@ fun main(args: Array<String>) {
     midiPort.value = "/dev/midi3"
 
     presets.update {
-        PresetsManager.loadPresets("presets.json").toMutableList().let {
+        PresetsManager.loadPresets(presetsFilePath.value).toMutableList().let {
             "Loaded ${it.size} presets".debug()
             it
         }
@@ -280,9 +240,7 @@ fun main(args: Array<String>) {
 //        }
 //        Uart.requestStatus()
 //        Uart.requestFirmware()
-            midi.value?.requestDump()
-            //Todo: Change message does not work
-//            midi.value?.sendMessage(ChangeMessage(1, it))
+//            midi.value?.requestDump()
         }
     }
 }

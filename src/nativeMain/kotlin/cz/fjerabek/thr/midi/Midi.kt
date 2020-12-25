@@ -4,6 +4,7 @@ import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.newThreadScheduler
 import cz.fjerabek.thr.LogUtils.debug
+import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.midi.messages.*
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.addressOf
@@ -71,13 +72,16 @@ class Midi(port: String) {
 
     fun startMessageReceiver() = observable<IMidiMessage> {
         while (true) {
-            it.onNext(readMessage())
+            try {
+                it.onNext(readMessage())
+            } catch (e: MidiUnknownMessageException) {
+                "Received unknown midi message".warn()
+            }
         }
     }.observeOn(newThreadScheduler)
 
     private fun send(data: ByteArray) {
         val midiData = byteArrayOf(0xF0.toByte()) + data + byteArrayOf(0xF7.toByte())
-        "Midi sending data: ${midiData.toHexString()}".debug()
         midiData.usePinned {
             val written = fwrite(it.addressOf(0), 1.convert(), midiData.size.convert(), write)
             fflush(write)

@@ -42,7 +42,7 @@ kotlin {
                 implementation(kotlin("stdlib", org.jetbrains.kotlin.config.KotlinCompilerVersion.VERSION))
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.0-RC")
 //                implementation("org.kodein.di:kodein-di:7.1.0")
-                implementation("com.badoo.reaktive:reaktive:1.1.17")
+                implementation("com.badoo.reaktive:reaktive:1.1.19")
 
             }
         }
