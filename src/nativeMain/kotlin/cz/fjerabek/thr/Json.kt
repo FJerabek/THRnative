@@ -75,7 +75,11 @@ val serializerModule = SerializersModule {
         subclass(PresetSelect::class)
         subclass(CurrentPresetRq::class)
         subclass(RemovePresetRq::class)
-        subclass(AddPreset::class)
+        subclass(AddPresetRq::class)
+        subclass(Lamp::class)
+        subclass(WideStereo::class)
+        subclass(ConnectedRq::class)
+        subclass(Connected::class)
     }
 }
 

@@ -4,6 +4,7 @@ import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.newThreadScheduler
 import cz.fjerabek.thr.LogUtils.debug
+import cz.fjerabek.thr.LogUtils.info
 import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.midi.messages.*
 import kotlinx.cinterop.CPointer
@@ -103,6 +104,16 @@ class Midi(port: String) {
         send(dumpCommand)
     }
 
+    fun lamp(on: Boolean) {
+        val lamp = byteArrayOf(0xF0.toByte(), 0x43, 0x7D, 0x30, 0x41, 0x30, 0x01, if(on) 0x00 else 0x01, 0xF7.toByte())
+        send(lamp)
+    }
+
+    fun wideStereo(on: Boolean) {
+        val wideStereo = byteArrayOf(0xF0.toByte(), 0x43, 0x7D, 0x30, 0x41, 0x30, 0x00, if(on) 0x00 else 0x01, 0xF7.toByte())
+        send(wideStereo)
+    }
+
     fun close() {
         fclose(read)
         fclose(write)
@@ -139,7 +150,7 @@ class Midi(port: String) {
                 }.onFailure {
                     sleep(DISCOVERY_DELAY)
                 }.onSuccess {
-                    "Midi connected".debug()
+                    "Midi connected".info()
                     return it
                 }
             }

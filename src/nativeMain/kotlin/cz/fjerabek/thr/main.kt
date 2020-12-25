@@ -1,4 +1,4 @@
-@file:Suppress("UNCHECKED_CAST", "EXPERIMENTAL_UNSIGNED_TYPES")
+@file:Suppress("UNCHECKED_CAST")
 
 package cz.fjerabek.thr
 
@@ -28,23 +28,28 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import platform.posix.sleep
 import kotlin.native.concurrent.AtomicInt
 import kotlin.native.concurrent.SharedImmutable
-
+// Midi device
 @SharedImmutable
 val midi = AtomicReference<Midi?>(null)
 
+//Connected bluetooth device
 @ExperimentalUnsignedTypes
 @SharedImmutable
 val bluetoothConnection: AtomicReference<BluetoothConnection?> = AtomicReference(null)
 
+//Loaded presets
 @SharedImmutable
 val presets = AtomicReference<List<PresetMessage>>(listOf())
 
+//Midi port file location
 @SharedImmutable
 val midiPort = AtomicReference("/dev/midi3")
 
+//Preset save file location
 @SharedImmutable
 val presetsFilePath = AtomicReference("presets.json")
 
+//Current index of selected preset -1 is not saved custom
 @SharedImmutable
 val currentPreset = AtomicInt(-1)
 
@@ -80,23 +85,29 @@ fun onMidiError(throwable: Throwable) {
         is MidiDisconnectedException -> {
             "MIDI Disconnected".info()
             midi.value?.close()
+            bluetoothConnection.value?.sendMessage(Connected(false))
             midiConnect(midiPort.value)
+            midi.value = null
         }
         else -> "Midi error ${throwable.stackTraceToString()}".error()
     }
 }
+
 /**
  * Starts connecting to THR midi device. Blocks current thread if not connected
  */
 fun midiConnect(port: String) {
     observable<Midi> {
         it.onNext(Midi.waitForConnection(port))
-    }.observeOn(ioScheduler).subscribeOn(mainScheduler).subscribe {
-        midi.value = it
-        it.startMessageReceiver()
-            .subscribeOn(mainScheduler)
-            .subscribe(onError = ::onMidiError, onNext = ::onMidiMessage)
-    }
+    }.observeOn(ioScheduler)
+        .subscribeOn(mainScheduler)
+        .subscribe {
+            midi.value = it
+            bluetoothConnection.value?.sendMessage(Connected(true))
+            it.startMessageReceiver()
+                .subscribeOn(mainScheduler)
+                .subscribe(onError = ::onMidiError, onNext = ::onMidiMessage)
+        }
 }
 
 /**
@@ -122,11 +133,14 @@ fun bluetoothMessage(message: IBluetoothMessage) {
     when (message) {
         is IMidiMessage -> midi.value?.sendMessage(message)
         is FwVersionRq -> Uart.requestFirmware()
-        is HwStatusRq ->  Uart.requestStatus()
+        is HwStatusRq -> Uart.requestStatus()
         is PresetsRq -> bluetoothConnection.value?.sendMessage(PresetsResponse(presets.value))
         is CurrentPresetRq -> midi.value?.requestDump()
+        is Lamp -> midi.value?.lamp(message.on)
+        is WideStereo -> midi.value?.wideStereo(message.on)
+        is ConnectedRq -> bluetoothConnection.value?.sendMessage(Connected(midi.value != null))
         is RemovePresetRq -> {
-            if(message.index >= presets.value.size) {
+            if (message.index >= presets.value.size) {
                 "Invalid preset index: ${message.index} preset size: ${presets.value.size}".error()
             } else {
                 presets.update {
@@ -137,7 +151,7 @@ fun bluetoothMessage(message: IBluetoothMessage) {
         }
         is AddPresetRq -> {
             presets.update {
-                it.toMutableList().run{
+                it.toMutableList().run {
                     add(message.preset)
                     this
                 }
@@ -149,7 +163,7 @@ fun bluetoothMessage(message: IBluetoothMessage) {
             PresetsManager.savePresets(presetsFilePath.value, presets.value)
         }
         is PresetSelect -> {
-            if(message.index >= presets.value.size) {
+            if (message.index >= presets.value.size) {
                 "Invalid preset index: ${message.index} preset size: ${presets.value.size}".error()
             } else {
                 midi.value?.sendMessage(presets.value[message.index])
@@ -160,6 +174,7 @@ fun bluetoothMessage(message: IBluetoothMessage) {
 
 /**
  * Called when bluetooth connection is accepted
+ * @param connection accepted connection
  */
 fun bluetoothConnection(connection: BluetoothConnection) {
     "Bluetooth connected".info()
@@ -183,10 +198,36 @@ fun bluetoothConnect() {
 
 /**
  * Called on uart message received
+ * @param message received message
  */
 fun uartMessageReceived(message: UartMessage) {
     when (message) {
-        is ButtonMessage -> debug { message }
+        is ButtonMessage -> {
+            if (message.pressed) { //Run on press not release
+                when (message.id) {
+                    1 -> { //Left button
+                        if (currentPreset.value == -1 || currentPreset.value <= 0) {
+                            currentPreset.value = presets.value.size - 1
+                        } else {
+                            currentPreset.value--
+                        }
+                    }
+                    2 -> { //Right button
+                        if (currentPreset.value == -1 || currentPreset.value + 1 >= presets.value.size) {
+                            currentPreset.value = 0
+                        } else {
+                            currentPreset.value++
+                        }
+                    }
+                }
+                try {
+                    midi.value?.sendMessage(presets.value[currentPreset.value])
+                    bluetoothConnection.value?.sendMessage(PresetSelect(currentPreset.value))
+                } catch (e: MidiDisconnectedException) {
+                    onMidiError(e)
+                }
+            }
+        }
         is FWVersionMessage -> {
             bluetoothConnection.value?.sendMessage(message)
         }
@@ -215,15 +256,15 @@ fun setupUartReceiver() {
 @ExperimentalSerializationApi
 @ExperimentalUnsignedTypes
 fun main(args: Array<String>) {
-//    if (args.isEmpty()) {
-//        println("Needed path to midi device")
-//        return
-//    }
-    midiPort.value = "/dev/midi3"
+    if (args.isEmpty()) {
+        println("Needed path to midi device")
+        return
+    }
+    midiPort.value = args[0]
 
     presets.update {
         PresetsManager.loadPresets(presetsFilePath.value).toMutableList().let {
-            "Loaded ${it.size} presets".debug()
+            "Loaded ${it.size} presets".info()
             it
         }
     }
@@ -233,7 +274,7 @@ fun main(args: Array<String>) {
     setupUartReceiver()
 
     while (true) {
-        repeat(4) {
+        repeat(2) {
             sleep(2)
 //        bluetoothConnection.value?.run {
 //            sendMessage(HwStatusRq())
@@ -243,4 +284,5 @@ fun main(args: Array<String>) {
 //            midi.value?.requestDump()
         }
     }
+    //Todo: Add heartbeat monitor for midi
 }

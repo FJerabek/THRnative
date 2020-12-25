@@ -1,5 +1,3 @@
-import org.gradle.kotlin.dsl.support.compileKotlinScriptModuleTo
-
 plugins {
     kotlin("multiplatform") version "1.4.21"
     kotlin("plugin.serialization") version "1.4.21"
@@ -16,6 +14,7 @@ repositories {
 }
 
 kotlin {
+
     val hostOs = System.getProperty("os.name")
     val nativeTarget = when {
         hostOs == "Linux" && project.hasProperty("rpi") -> linuxArm32Hfp("native") {

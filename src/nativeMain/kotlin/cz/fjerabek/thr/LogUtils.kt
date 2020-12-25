@@ -1,5 +1,7 @@
 package cz.fjerabek.thr
 
+import com.badoo.reaktive.scheduler.singleScheduler
+import com.badoo.reaktive.scheduler.submit
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -56,16 +58,18 @@ object LogUtils {
         warn{this}
     }
 
-    fun log(level: LogLevel, message: String) {
-        val timeString = ByteArray(9)
-        memScoped {
-            val time: time_tVar = alloc()
-            time(time.ptr)
-            timeString.usePinned {
-                strftime(it.addressOf(0), 9, "%H:%M:%S", localtime(time.ptr))
+    private fun log(level: LogLevel, message: String) {
+        singleScheduler.submit {
+            val timeString = ByteArray(9)
+            memScoped {
+                val time: time_tVar = alloc()
+                time(time.ptr)
+                timeString.usePinned {
+                    strftime(it.addressOf(0), 9, "%H:%M:%S", localtime(time.ptr))
+                }
             }
+            println("${timeString.toKString()}\t[$level]\t${message}")
         }
-        println("${timeString.toKString()}\t[$level]\t${message}")
     }
 
     private fun color(color: ANSIColor, string: ()->String) = "$ANSI_ESCAPE${color.ansi}m${string()}$ANSI_RESET"

@@ -17,19 +17,21 @@ object PresetsManager {
         val file = fopen(presetFilePath, "wb")
         if (file == NULL) {
             "PresetManager save error: ${strerror(errno)?.toKString()}".error()
+        } else {
+            val string = serializer.encodeToString(presets)
+            fputs(string, file)
+            fclose(file)
         }
-        val string = serializer.encodeToString(presets)
-        fputs(string, file)
-        fclose(file)
     }
 
     fun loadPresets(presetFilePath: String): List<PresetMessage> {
         val file = fopen(presetFilePath, "rb")
         if (file == NULL) {
             "PresetManager load error: ${strerror(errno)?.toKString()}".error()
+            return emptyList()
         }
         fseek(file, 0, SEEK_END)
-        val length: Long = ftell(file)
+        val length: Long = ftell(file).convert()
         fseek(file, 0, SEEK_SET)
         val buffer = ByteArray(length.toInt())
         buffer.usePinned {

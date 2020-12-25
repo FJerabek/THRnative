@@ -35,6 +35,20 @@ class PresetsRq: IBluetoothMessage
 class CurrentPresetRq: IBluetoothMessage
 
 /**
+ * Request if THR is connected
+ */
+@Serializable
+@SerialName("ConnectedRq")
+class ConnectedRq: IBluetoothMessage
+
+/**
+ * Response if THR is connected
+ */
+@Serializable
+@SerialName("Connected")
+data class Connected(val connected: Boolean): IBluetoothMessage
+
+/**
  * Request for removal of presets
  * @param index preset index to remove
  */
@@ -73,4 +87,18 @@ data class PresetsResponse(val presets: List<PresetMessage>): IBluetoothMessage
 @Serializable
 @SerialName("PresetSelect")
 data class PresetSelect(val index: Int): IBluetoothMessage
+
+/**
+ * Turn on/off combo lamp
+ */
+@Serializable
+@SerialName("Lamp")
+data class Lamp(val on: Boolean): IBluetoothMessage
+
+/**
+ * Turn on/off wide stereo
+ */
+@Serializable
+@SerialName("WideStereo")
+data class WideStereo(val on: Boolean): IBluetoothMessage
 
