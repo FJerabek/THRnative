@@ -1,19 +1,22 @@
 package cz.fjerabek.thr.midi.messages
 
 import cz.fjerabek.thr.controls.*
+import cz.fjerabek.thr.controls.compressor.Compressor
+import cz.fjerabek.thr.controls.effect.Effect
+import cz.fjerabek.thr.controls.reverb.Reverb
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 @SerialName("Dump")
 class PresetMessage(
-        var name : String,
-        var mainPanel: MainPanel,
-        var compressor: Compressor? = null,
-        var effect: Effect? = null,
-        var delay: Delay? = null,
-        var reverb: Reverb? = null,
-        var gate: Gate? = null): IMidiMessage {
+    var name : String,
+    var mainPanel: MainPanel,
+    var compressor: Compressor? = null,
+    var effect: Effect? = null,
+    var delay: Delay? = null,
+    var reverb: Reverb? = null,
+    var gate: Gate? = null): IMidiMessage {
 
     constructor(dump: ByteArray): this(
             dump.sliceArray(prefix.size..80)

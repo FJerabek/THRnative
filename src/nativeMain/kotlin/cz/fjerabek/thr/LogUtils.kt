@@ -23,19 +23,20 @@ object LogUtils {
         ERROR(ANSIColor.RED);
 
         override fun toString(): String {
-            return this.color?.let { color(it){super.toString()} } ?: super.toString()
-        }}
+            return this.color?.let { color(it) { super.toString() } } ?: super.toString()
+        }
+    }
 
     fun debug(message: () -> Any) {
-        log(LogLevel.DEBUG, message().toString())
+        logAsync(LogLevel.DEBUG, message().toString())
     }
 
     fun info(message: () -> Any) {
-        log(LogLevel.INFO, message().toString())
+        logAsync(LogLevel.INFO, message().toString())
     }
 
     fun warn(message: () -> Any) {
-        log(LogLevel.WARN, message().toString())
+        logAsync(LogLevel.WARN, message().toString())
     }
 
     fun error(message: () -> Any) {
@@ -43,35 +44,39 @@ object LogUtils {
     }
 
     fun String.info() {
-        info{this}
+        info { this }
     }
 
     fun String.debug() {
-        debug{this}
+        debug { this }
     }
 
     fun String.error() {
-        error {this}
+        error { this }
     }
 
     fun String.warn() {
-        warn{this}
+        warn { this }
     }
 
-    private fun log(level: LogLevel, message: String) {
+    private fun logAsync(level: LogLevel, message: String) {
         singleScheduler.submit {
-            val timeString = ByteArray(9)
-            memScoped {
-                val time: time_tVar = alloc()
-                time(time.ptr)
-                timeString.usePinned {
-                    strftime(it.addressOf(0), 9, "%H:%M:%S", localtime(time.ptr))
-                }
-            }
-            println("${timeString.toKString()}\t[$level]\t${message}")
+            log(level, message)
         }
     }
 
-    private fun color(color: ANSIColor, string: ()->String) = "$ANSI_ESCAPE${color.ansi}m${string()}$ANSI_RESET"
+    private fun log(level: LogLevel, message: String) {
+        val timeString = ByteArray(9)
+        memScoped {
+            val time: time_tVar = alloc()
+            time(time.ptr)
+            timeString.usePinned {
+                strftime(it.addressOf(0), 9, "%H:%M:%S", localtime(time.ptr))
+            }
+        }
+        println("${timeString.toKString()}\t[$level]\t${message}")
+    }
+
+    private fun color(color: ANSIColor, string: () -> String) = "$ANSI_ESCAPE${color.ansi}m${string()}$ANSI_RESET"
 }
 

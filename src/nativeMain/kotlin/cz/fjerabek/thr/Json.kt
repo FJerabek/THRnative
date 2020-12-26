@@ -1,9 +1,9 @@
 package cz.fjerabek.thr
 
 import cz.fjerabek.thr.bluetooth.*
-import cz.fjerabek.thr.controls.Compressor
-import cz.fjerabek.thr.controls.Effect
-import cz.fjerabek.thr.controls.Reverb
+import cz.fjerabek.thr.controls.compressor.Compressor
+import cz.fjerabek.thr.controls.effect.Effect
+import cz.fjerabek.thr.controls.reverb.Reverb
 import cz.fjerabek.thr.controls.compressor.Rack
 import cz.fjerabek.thr.controls.compressor.Stomp
 import cz.fjerabek.thr.controls.effect.Chorus

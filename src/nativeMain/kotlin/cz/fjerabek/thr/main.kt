@@ -13,12 +13,10 @@ import com.badoo.reaktive.utils.atomic.update
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.LogUtils.info
-import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.bluetooth.*
 import cz.fjerabek.thr.file.PresetsManager
 import cz.fjerabek.thr.midi.Midi
 import cz.fjerabek.thr.midi.MidiDisconnectedException
-import cz.fjerabek.thr.midi.MidiUnknownMessageException
 import cz.fjerabek.thr.midi.messages.ChangeMessage
 import cz.fjerabek.thr.midi.messages.HeartBeatMessage
 import cz.fjerabek.thr.midi.messages.IMidiMessage
@@ -28,6 +26,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import platform.posix.sleep
 import kotlin.native.concurrent.AtomicInt
 import kotlin.native.concurrent.SharedImmutable
+
 // Midi device
 @SharedImmutable
 val midi = AtomicReference<Midi?>(null)
@@ -262,27 +261,18 @@ fun main(args: Array<String>) {
     }
     midiPort.value = args[0]
 
-    presets.update {
-        PresetsManager.loadPresets(presetsFilePath.value).toMutableList().let {
-            "Loaded ${it.size} presets".info()
-            it
-        }
-    }
+//    presets.update {
+//        PresetsManager.loadPresets(presetsFilePath.value).toMutableList().let {
+//            "Loaded ${it.size} presets".info()
+//            it
+//        }
+//    }
 
     bluetoothConnect()
     midiConnect(midiPort.value)
     setupUartReceiver()
 
     while (true) {
-        repeat(2) {
-            sleep(2)
-//        bluetoothConnection.value?.run {
-//            sendMessage(HwStatusRq())
-//        }
-//        Uart.requestStatus()
-//        Uart.requestFirmware()
-//            midi.value?.requestDump()
-        }
+        sleep(60)
     }
-    //Todo: Add heartbeat monitor for midi
 }

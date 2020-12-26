@@ -1,15 +1,17 @@
-package cz.fjerabek.thr.controls
+package cz.fjerabek.thr.controls.compressor
 
-import cz.fjerabek.thr.controls.compressor.Rack
-import cz.fjerabek.thr.controls.compressor.Stomp
+import cz.fjerabek.thr.controls.IControl
 import cz.fjerabek.thr.enums.EStatus
 import cz.fjerabek.thr.enums.compressor.ECompressor
 import cz.fjerabek.thr.enums.compressor.ECompressorType
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 abstract class Compressor(
-    val compressorType: ECompressorType
+    //Default value is useless since it is specified by inheriting class
+    @Transient
+    val compressorType: ECompressorType = ECompressorType.STOMP
 ) : IControl {
 
     abstract val status : EStatus

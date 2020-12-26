@@ -1,6 +1,5 @@
 package cz.fjerabek.thr.controls.reverb
 
-import cz.fjerabek.thr.controls.Reverb
 import cz.fjerabek.thr.enums.EStatus
 import cz.fjerabek.thr.enums.reverb.*
 import kotlinx.serialization.SerialName

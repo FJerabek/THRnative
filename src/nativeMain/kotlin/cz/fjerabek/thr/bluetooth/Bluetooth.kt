@@ -3,8 +3,10 @@ package cz.fjerabek.thr.bluetooth
 import bluez.BTPROTO_RFCOMM
 import bluez.register_rfcomm_sdp
 import bluez.sockaddr_rc
+import bluez.BTPROTO_HCI
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
+import cz.fjerabek.thr.LogUtils.info
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -49,7 +51,7 @@ object Bluetooth {
             val opt = cValue<socklen_tVar>()
             val remoteAddr = cValue<sockaddr_rc>()
 
-            debug { "Bluetooth accepting connection" }
+            "Bluetooth accepting connection".info()
             val client = accept(socket, remoteAddr.ptr.reinterpret(), opt.ptr)
 
             return BluetoothConnection(client)
@@ -58,23 +60,17 @@ object Bluetooth {
 
     fun checkBluetoothPermissions() {
         if( access( "/var/run/sdp", F_OK ) != 0 ) {
-            error {
-                "Bluetooth sdp not found"
-            }
+            "Bluetooth sdp not found".error()
             exit(1)
         }
 
         if( access( "/var/run/sdp", R_OK) != 0 ) {
-            error {
-                "No read access to bluetooth sdp"
-            }
+            "No read access to bluetooth sdp".error()
             exit(1)
         }
 
         if( access( "/var/run/sdp", R_OK) != 0 ) {
-            error {
-                "No read access to bluetooth sdp"
-            }
+            "No read access to bluetooth sdp".error()
             exit(1)
         }
     }

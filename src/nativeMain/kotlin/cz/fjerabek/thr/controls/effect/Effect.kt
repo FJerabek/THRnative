@@ -1,16 +1,17 @@
-package cz.fjerabek.thr.controls
+package cz.fjerabek.thr.controls.effect
 
-import cz.fjerabek.thr.controls.effect.*
+import cz.fjerabek.thr.controls.IControl
 import cz.fjerabek.thr.enums.EStatus
 import cz.fjerabek.thr.enums.effect.EEffect
 import cz.fjerabek.thr.enums.effect.EEffectType
-import kotlinx.serialization.Polymorphic
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 abstract class Effect(
-    val effectType: EEffectType
+    //Default value is useless since it is specified by inheriting class
+    @Transient
+    val effectType: EEffectType = EEffectType.CHORUS
 ) : IControl {
 
     abstract val status : EStatus

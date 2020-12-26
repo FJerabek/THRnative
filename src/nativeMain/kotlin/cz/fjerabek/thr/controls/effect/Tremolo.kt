@@ -1,6 +1,5 @@
 package cz.fjerabek.thr.controls.effect
 
-import cz.fjerabek.thr.controls.Effect
 import cz.fjerabek.thr.enums.EStatus
 import cz.fjerabek.thr.enums.effect.*
 import kotlinx.serialization.SerialName

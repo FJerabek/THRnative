@@ -1,13 +1,11 @@
 package cz.fjerabek.thr.controls.effect
 
-import cz.fjerabek.thr.controls.Effect
 import cz.fjerabek.thr.enums.EStatus
 import cz.fjerabek.thr.enums.effect.EEffect
 import cz.fjerabek.thr.enums.effect.EEffectType
 import cz.fjerabek.thr.enums.effect.EFlanger
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import platform.posix.stat
 
 @Serializable
 @SerialName("Flanger")

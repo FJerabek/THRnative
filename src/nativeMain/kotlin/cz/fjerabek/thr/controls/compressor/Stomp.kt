@@ -1,6 +1,5 @@
 package cz.fjerabek.thr.controls.compressor
 
-import cz.fjerabek.thr.controls.Compressor
 import cz.fjerabek.thr.enums.EStatus
 import cz.fjerabek.thr.enums.compressor.ECompressor
 import cz.fjerabek.thr.enums.compressor.ECompressorType
