@@ -1,20 +1,20 @@
 package cz.fjerabek.thr.bluetooth
 
+import com.badoo.reaktive.observable.observable
+import com.badoo.reaktive.observable.observeOn
+import com.badoo.reaktive.scheduler.ioScheduler
+import cz.fjerabek.thr.LogUtils.debug
+import cz.fjerabek.thr.LogUtils.warn
+import cz.fjerabek.thr.serializer
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
-import com.badoo.reaktive.observable.observable
-import com.badoo.reaktive.observable.observeOn
-import com.badoo.reaktive.scheduler.ioScheduler
-import cz.fjerabek.thr.LogUtils
-import cz.fjerabek.thr.LogUtils.debug
-import cz.fjerabek.thr.LogUtils.warn
-import cz.fjerabek.thr.serializer
 import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.decodeFromString
-import platform.posix.*
+import platform.posix.close
+import platform.posix.read
+import platform.posix.write
 
 @ExperimentalUnsignedTypes
 class BluetoothConnection(

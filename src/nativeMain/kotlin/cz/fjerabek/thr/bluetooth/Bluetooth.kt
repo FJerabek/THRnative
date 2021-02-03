@@ -3,8 +3,6 @@ package cz.fjerabek.thr.bluetooth
 import bluez.BTPROTO_RFCOMM
 import bluez.register_rfcomm_sdp
 import bluez.sockaddr_rc
-import bluez.BTPROTO_HCI
-import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.LogUtils.info
 import kotlinx.cinterop.*

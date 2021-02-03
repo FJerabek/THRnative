@@ -60,9 +60,9 @@ object LogUtils {
     }
 
     private fun logAsync(level: LogLevel, message: String) {
-        singleScheduler.submit {
+//        singleScheduler.submit {
             log(level, message)
-        }
+//        }
     }
 
     private fun log(level: LogLevel, message: String) {

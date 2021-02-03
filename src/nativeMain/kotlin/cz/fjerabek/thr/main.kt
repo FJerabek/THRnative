@@ -15,6 +15,7 @@ import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.LogUtils.info
 import cz.fjerabek.thr.bluetooth.*
 import cz.fjerabek.thr.file.PresetsManager
+import cz.fjerabek.thr.glib.GLib
 import cz.fjerabek.thr.midi.Midi
 import cz.fjerabek.thr.midi.MidiDisconnectedException
 import cz.fjerabek.thr.midi.messages.ChangeMessage
@@ -273,6 +274,7 @@ fun main(args: Array<String>) {
     setupUartReceiver()
 
     while (true) {
+        GLib.send()
         sleep(60)
     }
 }
