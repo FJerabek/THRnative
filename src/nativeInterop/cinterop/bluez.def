@@ -8,7 +8,7 @@ headers = /usr/include/bluetooth/bluetooth.h \
 headerFilter = /usr/include/bluetooth/*
 
 compilerOpts.linux = -I/usr/include
-linkerOpts.linux_arm32_hfp = -L /home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/bluetooth_armhf -lbluetooth
+linkerOpts.linux_arm32_hfp = -L /home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/armhf_libs/bluetooth -lbluetooth
 linkerOpts.linux_x64 = -L /usr/lib/x86_64-linux-gnu -lbluetooth
 
 #FIXME: Remove uart setup from bluetooth def file
