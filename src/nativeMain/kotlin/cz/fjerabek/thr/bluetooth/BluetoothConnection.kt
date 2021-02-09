@@ -6,20 +6,32 @@ import com.badoo.reaktive.scheduler.ioScheduler
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.serializer
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.toKString
-import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.*
 import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.SerializationException
-import platform.posix.close
-import platform.posix.read
-import platform.posix.write
+import platform.posix.*
 
 @ExperimentalUnsignedTypes
 class BluetoothConnection(
     private val socketDescriptor: Int
 ) {
+    init {
+        memScoped {
+            setToBlockingMode(socketDescriptor)
+        }
+    }
+
+    private fun setToBlockingMode(fd: Int) {
+        var options = fcntl(fd, F_GETFL)
+        if(options < 0) {
+            throw BluetoothException("Unable to get bluetooth socket options")
+        }
+        options = options.and(O_NONBLOCK.inv())
+
+        if(fcntl(fd, F_SETFL, options) < 0) {
+            throw BluetoothException("Unable to set bluetooth socket options")
+        }
+    }
     private fun read(): ByteArray {
         val buffer = ByteArray(2048)
         var readBytes = 0L
@@ -36,7 +48,7 @@ class BluetoothConnection(
     }
 
     fun startReceiver() = observable<IBluetoothMessage> {
-        "Starting receiver".debug()
+        "Starting bluetooth receiver".debug()
         while (true) {
             try {
                 val stringMessage = readString()
@@ -67,9 +79,5 @@ class BluetoothConnection(
 
     fun sendMessage(message: IBluetoothMessage) {
         writeString(serializer.encodeToString(PolymorphicSerializer(IBluetoothMessage::class), message))
-    }
-
-    fun close() {
-        close(socketDescriptor)
     }
 }

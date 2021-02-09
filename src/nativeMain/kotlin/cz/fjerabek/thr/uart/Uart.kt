@@ -1,6 +1,6 @@
 package cz.fjerabek.thr.uart
 
-import bluez.setupSerial
+import glib.setupSerial //Todo: Move setup serial method somewhere else
 import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.ioScheduler
@@ -23,7 +23,6 @@ object Uart {
     private val uart = open(UART_FILE, O_RDWR or O_NOCTTY)
 
     init {
-        setupSerial(this.uart)
         setupSerial(this.uart)
     }
 

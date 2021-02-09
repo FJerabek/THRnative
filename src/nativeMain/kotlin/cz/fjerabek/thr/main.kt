@@ -23,10 +23,14 @@ import cz.fjerabek.thr.midi.messages.HeartBeatMessage
 import cz.fjerabek.thr.midi.messages.IMidiMessage
 import cz.fjerabek.thr.midi.messages.PresetMessage
 import cz.fjerabek.thr.uart.*
+import glib.*
+import kotlinx.cinterop.staticCFunction
 import kotlinx.serialization.ExperimentalSerializationApi
 import platform.posix.sleep
 import kotlin.native.concurrent.AtomicInt
 import kotlin.native.concurrent.SharedImmutable
+import kotlin.native.concurrent.Worker
+import kotlin.native.concurrent.withWorker
 
 // Midi device
 @SharedImmutable
@@ -117,9 +121,7 @@ fun bluetoothError(e: Throwable) {
     when (e) {
         is BluetoothConnectionClosedException -> {
             "Bluetooth connection closed".info()
-            bluetoothConnection.value?.close()
             bluetoothConnection.value = null
-            bluetoothConnect()
         }
         else -> "Bluetooth error: ${e.stackTraceToString()}".error()
     }
@@ -182,18 +184,6 @@ fun bluetoothConnection(connection: BluetoothConnection) {
     connection.startReceiver()
         .subscribeOn(ioScheduler)
         .subscribe(onError = ::bluetoothError, onNext = ::bluetoothMessage)
-}
-
-/**
- * Starts bluetooth connection receiver on io thread
- */
-fun bluetoothConnect() {
-    observable<BluetoothConnection> {
-        val connection = Bluetooth.acceptConnection()
-        it.onNext(connection)
-    }.observeOn(ioScheduler)
-        .subscribeOn(ioScheduler)
-        .subscribe(onError = ::bluetoothError, onNext = ::bluetoothConnection)
 }
 
 /**
@@ -269,12 +259,27 @@ fun main(args: Array<String>) {
 //        }
 //    }
 
-    bluetoothConnect()
+//    bluetoothConnect()
     midiConnect(midiPort.value)
     setupUartReceiver()
+    Bluetooth.sdpRegister() //Starts accepting connections
+//    GLib.test()
 
-    while (true) {
-        GLib.send()
-        sleep(60)
+//    while (true) {
+//        "setting discoverable to true".info()
+//        BluetoothAdapter.discoverable = true
+//        sleep(60)
+//        BluetoothAdapter.discoverable = false
+//        "setting discoverable to false".info()
+//    }
+
+    val mainLoop = g_main_loop_new(null, 0)
+    val timeoutFunction = staticCFunction<gpointer?, gboolean>{
+        "Inverting bluetooth discoverable".info()
+        BluetoothAdapter.discoverable = !BluetoothAdapter.discoverable
+        1
     }
+//    g_timeout_add(1000, timeoutFunction, null)
+    "Starting main loop".info()
+    g_main_loop_run(mainLoop)
 }

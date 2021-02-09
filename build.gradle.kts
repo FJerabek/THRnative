@@ -19,13 +19,13 @@ kotlin {
     val nativeTarget = when {
         hostOs == "Linux" && project.hasProperty("rpi") -> linuxArm32Hfp("native") {
             val main by compilations.getting
-            val bluez by main.cinterops.creating
             val glib by main.cinterops.creating
+//            val termios by main.cinterops.creating
         }
         hostOs == "Linux" -> linuxX64("native") {
             val main by compilations.getting
-            val bluez by main.cinterops.creating
             val glib by main.cinterops.creating
+//            val termios by main.cinterops.creating
         }
         else -> throw GradleException("Host OS is not supported")
     }

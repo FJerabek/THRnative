@@ -2,19 +2,60 @@
 
 package cz.fjerabek.thr.glib
 
+import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
+import cz.fjerabek.thr.LogUtils.info
+import cz.fjerabek.thr.bluetooth.Bluetooth
 import glib.*
 import kotlinx.cinterop.*
+import platform.posix.errno
+import platform.posix.strerror
+import platform.posix.write
 
 /**
  * Utility library wrapping GLib C library used for DBUS communication
  */
 object GLib {
-    private val dbus: CPointer<GDBusConnection>? = g_bus_get_sync(G_BUS_TYPE_SYSTEM, null, null)
+     val dbus: CPointer<GDBusConnection>? = memScoped {
+        val error = allocPointerTo<GError>()
+        val connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, null, error.ptr)
+        error.value?.let { //Check for error while opening dbus
+            "Error opening dbus: ${it.pointed.message?.toKString()}".error()
+        }
 
-    init {
-        if (dbus == null)
-            "Error opening dbus".error()
+        requestBusName(connection, "cz.fjerabek.thr")
+
+        g_dbus_connection_get_unique_name(connection)?.let {
+            "Unique dbus name: ${it.toKString()}".debug()
+        } ?: "Error getting unique name".error()
+        connection
+    }
+
+    /**
+     * Requests name for bus
+     * @param
+     */
+    private fun requestBusName(connection: CPointer<GDBusConnection>?, name: String) {
+        memScoped {
+            val error = allocPointerTo<GError>()
+            val reply = g_dbus_connection_call_sync(
+                connection,
+                "org.freedesktop.DBus",
+                "/",
+                "org.freedesktop.DBus",
+                "RequestName",
+                g_variant_new("(su)", name.cstr, G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT),
+                null,
+                G_DBUS_CALL_FLAGS_NONE,
+                -1,
+                null,
+                error.ptr
+            )//Request name for bus connection
+
+            error.value?.let { //Check for error while opening dbus
+                "Error requesting bus name: ${it.pointed.message?.toKString()}".error()
+            }
+        }
     }
 
     /**
@@ -23,7 +64,7 @@ object GLib {
      * @return variant with data
      */
     @Suppress("USELESS_CAST") //The cast is needed because CInterop does not know what type to use
-    fun createVariant(data: Any) = when(data) {
+    private fun createVariant(data: Any) = when (data) {
         is Boolean -> g_variant_new("b", data as Boolean)
         is Int -> g_variant_new("i", data as Int)
         is UInt -> g_variant_new("u", data as UInt)
@@ -44,7 +85,7 @@ object GLib {
      * @return data in variant
      */
     private fun getVariantData(variant: CPointer<GVariant>): Any? {
-        return when(val type = g_variant_get_type_string(variant)?.toKString()) {
+        return when (val type = g_variant_get_type_string(variant)?.toKString()) {
             "b" -> g_variant_get_boolean(variant) == 1
             "i" -> g_variant_get_int32(variant)
             "u" -> g_variant_get_uint32(variant)
@@ -63,7 +104,6 @@ object GLib {
 
     /**
      * Gets parameter from DBUS object specified by objectPath and paramName
-     * @param busName name of the bus
      * @param objectPath path to the DBUS object
      * @param interfaceName name of the interface
      * @param paramName parameter name
@@ -101,7 +141,7 @@ object GLib {
                 val variant = allocPointerTo<GVariant>()
                 g_variant_get(it, "(v)", variant)
 
-               variant.value?.let {
+                variant.value?.let {
                     getVariantData(it)
                 }
             }
@@ -115,7 +155,6 @@ object GLib {
 
     /**
      * Sets parameter in DBUS object specified by objectPath and paramName
-     * @param busName name of the bus
      * @param objectPath path to the DBUS object
      * @param interfaceName name of the interface
      * @param paramName parameter name
