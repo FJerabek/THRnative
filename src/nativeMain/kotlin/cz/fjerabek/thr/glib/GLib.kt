@@ -4,26 +4,31 @@ package cz.fjerabek.thr.glib
 
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
-import cz.fjerabek.thr.LogUtils.info
-import cz.fjerabek.thr.bluetooth.Bluetooth
 import glib.*
 import kotlinx.cinterop.*
-import platform.posix.errno
-import platform.posix.strerror
-import platform.posix.write
+
+
+open class GLibException(message: String) : Exception(message)
+class GLibObjectRegisterException(message: String) : GLibException(message)
+class GLibVariantUnsupportedData(message: String) : GLibException(message)
+class GLibParameterException(message: String) : GLibException(message)
+class GLibInterfaceInfoException(message: String): GLibException(message)
+class GLibMethodCallException(message: String): GLibException(message)
+class DBusUnknownMethodException(message: String): GLibException(message)
 
 /**
  * Utility library wrapping GLib C library used for DBUS communication
  */
 object GLib {
-     val dbus: CPointer<GDBusConnection>? = memScoped {
+
+    private val dbus: CPointer<GDBusConnection>? = memScoped {
         val error = allocPointerTo<GError>()
         val connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, null, error.ptr)
         error.value?.let { //Check for error while opening dbus
             "Error opening dbus: ${it.pointed.message?.toKString()}".error()
         }
 
-        requestBusName(connection, "cz.fjerabek.thr")
+//        requestBusName(connection, "cz.fjerabek.thr")
 
         g_dbus_connection_get_unique_name(connection)?.let {
             "Unique dbus name: ${it.toKString()}".debug()
@@ -31,14 +36,16 @@ object GLib {
         connection
     }
 
+
     /**
      * Requests name for bus
-     * @param
+     * @param connection dbus connection
+     * @param name requested name
      */
     private fun requestBusName(connection: CPointer<GDBusConnection>?, name: String) {
         memScoped {
             val error = allocPointerTo<GError>()
-            val reply = g_dbus_connection_call_sync(
+            g_dbus_connection_call_sync(
                 connection,
                 "org.freedesktop.DBus",
                 "/",
@@ -74,8 +81,7 @@ object GLib {
         is ULong -> g_variant_new("t", data as ULong)
         is String -> g_variant_new("s", data as String)
         else -> {
-            "Unsupported data type: $data".error()
-            g_variant_new("")
+            throw GLibVariantUnsupportedData("Unsupported data type: $data")
         }
     }
 
@@ -96,8 +102,7 @@ object GLib {
             "s" -> g_variant_get_string(variant, null)?.toKString()
             "" -> null
             else -> {
-                "Parameter type ($type) not supported".error()
-                null
+                throw GLibVariantUnsupportedData("Unsupported data type: $type")
             }
         }
     }
@@ -110,47 +115,31 @@ object GLib {
      * @return return parameter value with parameter type
      */
     fun getParam(busName: String, objectPath: String, interfaceName: String, paramName: String): Any? {
-        val method =
-            g_dbus_message_new_method_call(
+        val params = g_variant_new("(ss)", interfaceName.cstr, paramName.cstr)
+        return memScoped {
+            val error = allocPointerTo<GError>()
+            val response = g_dbus_connection_call_sync(
+                dbus,
                 busName,
                 objectPath,
                 "org.freedesktop.DBus.Properties",
-                "Get"
-            ) //Create DBUS method call object
+                "Get",
+                params,
+                g_variant_type_checked_("(v)"),
+                G_DBUS_SEND_MESSAGE_FLAGS_NONE,
+                -1,
+                null,
+                error.ptr
+            )
 
-        val params = g_variant_new("(ss)", interfaceName.cstr, paramName.cstr)
-        g_dbus_message_set_body(method, params) //Set method parameters
-
-        val reply = g_dbus_connection_send_message_with_reply_sync(
-            dbus,
-            method,
-            G_DBUS_SEND_MESSAGE_FLAGS_NONE,
-            -1,
-            null,
-            null,
-            null
-        )//Get method reply
-
-        g_dbus_message_get_error_name(reply)?.let {
-            "Error sending DBUS get method call: ${it.toKString()}".error()
-            return null
-        }
-
-        g_dbus_message_get_body(reply)?.let {
-            return memScoped {
-                val variant = allocPointerTo<GVariant>()
-                g_variant_get(it, "(v)", variant)
-
-                variant.value?.let {
-                    getVariantData(it)
+            response?.let {
+                getVariantData(it)
+            } ?: {
+                error.value?.let {
+                    throw GLibParameterException("Parameter get error: ${it.pointed.message?.toKString()}")
                 }
             }
-        } ?: "Param get error: ${g_dbus_message_get_error_name(reply)?.toKString()}".error()
-
-        //Todo: Free param, method object and reply
-//        g_free(params)
-//        g_free(method)
-        return null
+        }
     }
 
     /**
@@ -161,29 +150,138 @@ object GLib {
      * @param data data to set to parameter. Must be in correct type
      */
     fun setParam(busName: String, objectPath: String, interfaceName: String, paramName: String, data: Any) {
-        val method =
-            g_dbus_message_new_method_call(
+        val params = g_variant_new("(ssv)", interfaceName.cstr, paramName.cstr, createVariant(data))
+        memScoped {
+            val error = allocPointerTo<GError>()
+            g_dbus_connection_call_sync(
+                dbus,
                 busName,
                 objectPath,
                 "org.freedesktop.DBus.Properties",
-                "Set"
-            ) //Create DBUS method call object
+                "Set",
+                params,
+                null,
+                G_DBUS_SEND_MESSAGE_FLAGS_NONE,
+                -1,
+                null,
+                error.ptr
+            )
+            error.value?.let {
+                throw GLibParameterException("Error setting parameter ${it.pointed.message?.toKString()}")
+            }
+        }
+    }
 
-        val params = g_variant_new("(ssv)", interfaceName.cstr, paramName.cstr, createVariant(data))
-        g_dbus_message_set_body(method, params) //Set method parameters
+    /**
+     * Method wrapping call to the interface lookup method
+     * @param interfaceIntrospectDescription Interface introspection string data
+     * @param name interface name
+     */
+    fun getInterfaceInfo(
+        interfaceIntrospectDescription: String,
+        name: String
+    ): CPointer<GDBusInterfaceInfo> = memScoped {
+        val error = allocPointerTo<GError>()
+        val nodeInfo = g_dbus_node_info_new_for_xml(interfaceIntrospectDescription, error.ptr)
+        error.value?.let {
+            throw GLibInterfaceInfoException("Error creating node from xml ${it.pointed.message?.toKString()}")
+        }
+        g_dbus_node_info_lookup_interface(nodeInfo, name)!!
+    }
 
-        val reply = g_dbus_connection_send_message_with_reply_sync(
+    /**
+     * Wraps calling to dbus register object method
+     * @param objectPath path for the object registration
+     * @param interfaceInfo info about implemented interface
+     * @param vTable vector table for method calls
+     * @param userData user data passed to methods
+     * @param userFreeFunc method called to free user data
+     */
+    fun registerObject(
+        objectPath: String,
+        interfaceInfo: CValuesRef<GDBusInterfaceInfo>,
+        vTable: CValuesRef<GDBusInterfaceVTable>,
+        userData: gpointer?,
+        userFreeFunc: GDestroyNotify?
+    ) {
+        memScoped {
+            val error = allocPointerTo<GError>()
+            g_dbus_connection_register_object(
+                dbus,
+                objectPath,
+                interfaceInfo,
+                vTable,
+                userData,
+                userFreeFunc,
+                error.ptr
+            )
+            error.pointed?.let {
+                throw GLibObjectRegisterException(
+                    it.message?.toKString() ?: "Object register exception without error message"
+                )
+            }
+        }
+    }
+
+    /**
+     * Synchronous call to dbus method
+     * @param busName name of the bus on which the method is
+     * @param objectPath path to the object to call method on
+     * @param interfaceName interface name to which the method belong to
+     * @param methodName name of the method to call
+     * @param parameters method parameters
+     * @param replyType variant type representing the response type
+     */
+    fun methodCallWithReply(
+        busName: String,
+        objectPath: String,
+        interfaceName: String,
+        methodName: String,
+        parameters: CValuesRef<GVariant>?,
+        replyType: CValuesRef<GVariantType>?
+    ): CPointer<GVariant>? = memScoped {
+        val error = allocPointerTo<GError>()
+        val reply = g_dbus_connection_call_sync(
             dbus,
-            method,
-            G_DBUS_SEND_MESSAGE_FLAGS_NONE,
+            busName,
+            objectPath,
+            interfaceName,
+            methodName,
+            parameters,
+            replyType,
+            G_DBUS_CALL_FLAGS_NONE,
             -1,
             null,
-            null,
+            error.ptr
+        )
+        error.value?.let {
+            throw GLibMethodCallException(it.pointed.message?.toKString() ?: "Method call error without message")
+        }
+        reply
+    }
+
+    /**
+     * Synchronous call to dbus method with no return value
+     * @param busName name of the bus on which the method is
+     * @param objectPath path to the object to call method on
+     * @param interfaceName interface name to which the method belong to
+     * @param methodName name of the method to call
+     * @param parameters method parameters
+     */
+    fun methodCall(
+        busName: String,
+        objectPath: String,
+        interfaceName: String,
+        methodName: String,
+        parameters: CValuesRef<GVariant>?
+    ) {
+        methodCallWithReply(
+            busName,
+            objectPath,
+            interfaceName,
+            methodName,
+            parameters,
             null
         )
-        g_dbus_message_get_error_name(reply)?.let {
-            "Error sending DBUS get method call: ${it.toKString()}".error()
-        }
-        //Todo: Free param, method object and reply
     }
 }

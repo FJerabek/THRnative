@@ -1,21 +1,7 @@
 headers = gio/gio.h glib.h gio/gunixfdlist.h
 
 compilerOpts.linux_arm32_hfp = -I/home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/armhf_libs/glib/glib-2.0 \
--I/home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/armhf_libs/glib/include
-compilerOpts.linux = -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/include/gio-unix-2.0
-#linkerOpts.linux_arm32_hfp = -L /home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/armhf_libs/glib -lglib-2.0 -lgio-2.0
-linkerOpts.linux = -L /usr/lib/x86_64-linux-gnu -lglib-2.0 -lgio-2.0
-
----
-
-#include <termios.h>
-void setupSerial(int fd) {
-    struct termios options;
-    tcgetattr(fd, &options);
-    options.c_cflag = B115200 | CS8 | CLOCAL | CREAD;
-    options.c_iflag = IGNPAR;
-    options.c_oflag = 0;
-    options.c_lflag = 0;
-    tcflush(fd, TCIFLUSH);
-    tcsetattr(fd, TCSANOW, &options);
-}
+-I/home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/armhf_libs/glib/include -I/usr/include/gio-unix-2.0
+compilerOpts.linux_x64 = -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/include/gio-unix-2.0
+linkerOpts.linux_arm32_hfp = -L /home/fjerabek/IdeaProjects/THR-native/src/nativeInterop/armhf_libs/glib -lglib-2.0 -lgio-2.0
+linkerOpts.linux_x64 = -L /usr/lib/x86_64-linux-gnu -lglib-2.0 -lgio-2.0

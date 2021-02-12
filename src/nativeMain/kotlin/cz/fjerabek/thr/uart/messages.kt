@@ -1,5 +1,7 @@
 package cz.fjerabek.thr.uart
 
+import com.badoo.reaktive.utils.atomic.getAndUpdate
+import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.bluetooth.IBluetoothMessage
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -9,8 +11,7 @@ abstract class UartMessage: IBluetoothMessage {
         fun fromString(string: String): UartMessage {
             val params = string.split(";")
 
-            //TODO: Some better way to do this
-            when(params[0]) {
+            when(params[0].trim()) {
                 "\$btn" -> {
                     return ButtonMessage(
                         params[1].toInt(),
@@ -19,18 +20,22 @@ abstract class UartMessage: IBluetoothMessage {
                     )
                 }
                 "\$ok" -> {
-                    when (params.size) {
-                        1 -> {
+                    var cmd: String = ""
+                    uartQueue.getAndUpdate {
+                        it.toMutableList().apply { cmd = removeLast() }
+                    }
+                    when (cmd) {
+                        Uart.CMD_SHUTDOWN -> {
                             return ShutdownMessage(true);
                         }
-                        4 -> {
+                        Uart.CMD_FW -> {
                             return FWVersionMessage(
                                 params[1].trim().toInt(),
                                 params[2].trim().toInt(),
                                 params[3].trim().toInt()
                             )
                         }
-                        else -> {
+                        Uart.CMD_STATUS -> {
                             return StatusMessage(
                                 params[1].trim().toLong(),
                                 params[2].trim().toInt(),
@@ -38,10 +43,14 @@ abstract class UartMessage: IBluetoothMessage {
                                 params[4].trim().toInt()
                             )
                         }
+                        Uart.CMD_HBT -> { return HbtMessage()}
+                        else -> {
+                            throw UnsupportedOperationException("Received invalid message")
+                        }
                     }
                 }
                 else -> {
-                    throw UnsupportedOperationException("Received invalid message")
+                    throw UnsupportedOperationException("Received invalid message: $params")
                 }
             }
         }
@@ -76,3 +85,5 @@ data class StatusMessage(
 data class ShutdownMessage(
     val ok: Boolean
 ) : UartMessage()
+
+class HbtMessage : UartMessage()

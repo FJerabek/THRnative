@@ -1,4 +1,4 @@
-@file:Suppress("UNCHECKED_CAST")
+@file:Suppress("UNCHECKED_CAST", "EXPERIMENTAL_UNSIGNED_TYPES")
 
 package cz.fjerabek.thr
 
@@ -8,14 +8,15 @@ import com.badoo.reaktive.observable.subscribe
 import com.badoo.reaktive.observable.subscribeOn
 import com.badoo.reaktive.scheduler.ioScheduler
 import com.badoo.reaktive.scheduler.mainScheduler
+import com.badoo.reaktive.utils.atomic.AtomicLong
 import com.badoo.reaktive.utils.atomic.AtomicReference
 import com.badoo.reaktive.utils.atomic.update
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.LogUtils.info
+import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.bluetooth.*
 import cz.fjerabek.thr.file.PresetsManager
-import cz.fjerabek.thr.glib.GLib
 import cz.fjerabek.thr.midi.Midi
 import cz.fjerabek.thr.midi.MidiDisconnectedException
 import cz.fjerabek.thr.midi.messages.ChangeMessage
@@ -24,41 +25,40 @@ import cz.fjerabek.thr.midi.messages.IMidiMessage
 import cz.fjerabek.thr.midi.messages.PresetMessage
 import cz.fjerabek.thr.uart.*
 import glib.*
-import kotlinx.cinterop.staticCFunction
+import kotlinx.cinterop.*
 import kotlinx.serialization.ExperimentalSerializationApi
-import platform.posix.sleep
+import platform.posix.*
 import kotlin.native.concurrent.AtomicInt
 import kotlin.native.concurrent.SharedImmutable
-import kotlin.native.concurrent.Worker
-import kotlin.native.concurrent.withWorker
 
 // Midi device
 @SharedImmutable
 val midi = AtomicReference<Midi?>(null)
-
 //Connected bluetooth device
 @ExperimentalUnsignedTypes
 @SharedImmutable
 val bluetoothConnection: AtomicReference<BluetoothConnection?> = AtomicReference(null)
-
 //Loaded presets
 @SharedImmutable
 val presets = AtomicReference<List<PresetMessage>>(listOf())
-
 //Midi port file location
 @SharedImmutable
 val midiPort = AtomicReference("/dev/midi3")
-
 //Preset save file location
 @SharedImmutable
 val presetsFilePath = AtomicReference("presets.json")
-
 //Current index of selected preset -1 is not saved custom
 @SharedImmutable
 val currentPreset = AtomicInt(-1)
+@SharedImmutable
+val leftButtonTimeoutId = AtomicLong(-1)
+@SharedImmutable
+val rightButtonTimeoutId = AtomicLong(-1)
 
 @ExperimentalUnsignedTypes
 fun ByteArray.toHexString() = asUByteArray().joinToString(" ") { it.toString(16).padStart(2, '0') }
+
+val mainLoop = g_main_loop_new(null, 0)
 
 /**
  * Called on midi message receive
@@ -196,6 +196,14 @@ fun uartMessageReceived(message: UartMessage) {
             if (message.pressed) { //Run on press not release
                 when (message.id) {
                     1 -> { //Left button
+                        val leftButtonTimeout = staticCFunction<gpointer?, gboolean> {
+                            "Left button long press".debug()
+                            leftButtonTimeoutId.value = -1
+                            0 //Return false so the timeout is not scheduled anymore
+                        }
+                        "Left button pressed setting timeout".debug()
+                        leftButtonTimeoutId.value = g_timeout_add(3000, leftButtonTimeout, null).toLong()
+
                         if (currentPreset.value == -1 || currentPreset.value <= 0) {
                             currentPreset.value = presets.value.size - 1
                         } else {
@@ -203,6 +211,18 @@ fun uartMessageReceived(message: UartMessage) {
                         }
                     }
                     2 -> { //Right button
+                        val rightButtonTimeout = staticCFunction<gpointer?, gboolean> {
+                            "Right button long press".debug()
+
+                            "Setting Bluetooth to discoverable and pairable".info()
+                            BluetoothAdapter.discoverable = true
+                            BluetoothAdapter.pairable = true
+                            rightButtonTimeoutId.value = -1
+                            0 //Return false so the timeout is not scheduled anymore
+                        }
+                        "Right button pressed setting timeout".debug()
+                        rightButtonTimeoutId.value = g_timeout_add(3000, rightButtonTimeout, null).toLong()
+
                         if (currentPreset.value == -1 || currentPreset.value + 1 >= presets.value.size) {
                             currentPreset.value = 0
                         } else {
@@ -216,6 +236,17 @@ fun uartMessageReceived(message: UartMessage) {
                 } catch (e: MidiDisconnectedException) {
                     onMidiError(e)
                 }
+            } else {
+                when (message.id) {
+                    1 -> { //Left button
+                        if (leftButtonTimeoutId.value != -1L)
+                            g_source_remove(leftButtonTimeoutId.value.toUInt())
+                    }
+                    2 -> { //Right button
+                        if (rightButtonTimeoutId.value != -1L)
+                            g_source_remove(rightButtonTimeoutId.value.toUInt())
+                    }
+                }
             }
         }
         is FWVersionMessage -> {
@@ -224,7 +255,11 @@ fun uartMessageReceived(message: UartMessage) {
         is StatusMessage ->
             bluetoothConnection.value?.sendMessage(message)
 
-        is ShutdownMessage -> debug { message }
+        is ShutdownMessage -> {
+            "Shutting down".warn()
+            system("shutdown -P now")
+        }
+        is HbtMessage -> {}
     }
 }
 
@@ -243,6 +278,7 @@ fun setupUartReceiver() {
         })
 }
 
+
 @ExperimentalSerializationApi
 @ExperimentalUnsignedTypes
 fun main(args: Array<String>) {
@@ -252,34 +288,45 @@ fun main(args: Array<String>) {
     }
     midiPort.value = args[0]
 
-//    presets.update {
-//        PresetsManager.loadPresets(presetsFilePath.value).toMutableList().let {
-//            "Loaded ${it.size} presets".info()
-//            it
-//        }
-//    }
+    signal(SIGINT, staticCFunction<Int, Unit> {
+        Uart.close()
+        g_main_loop_quit(mainLoop)
+        g_main_loop_unref(mainLoop)
+        exit(0)
+    })
 
-//    bluetoothConnect()
+    PresetsManager.loadPresets(presetsFilePath.value)
+    ?.let { loadedPresets ->
+        loadedPresets.toMutableList().let {
+            "Loaded ${loadedPresets.size} presets".info()
+            presets.update {
+                loadedPresets
+            }
+        }
+    } ?: run{
+        "Creating preset save file".info()
+        PresetsManager.savePresets(presetsFilePath.value, emptyList())
+    }
+
+    "Starting MIDI connector".info()
     midiConnect(midiPort.value)
+    "Setting up UART receiver".info()
     setupUartReceiver()
+    "Registering Bluetooth SDP record".info()
     Bluetooth.sdpRegister() //Starts accepting connections
-//    GLib.test()
+    "Registering Bluetooth agent".info()
+    PinAgent.registerAgent()
 
-//    while (true) {
-//        "setting discoverable to true".info()
-//        BluetoothAdapter.discoverable = true
-//        sleep(60)
-//        BluetoothAdapter.discoverable = false
-//        "setting discoverable to false".info()
-//    }
-
-    val mainLoop = g_main_loop_new(null, 0)
-    val timeoutFunction = staticCFunction<gpointer?, gboolean>{
-        "Inverting bluetooth discoverable".info()
-        BluetoothAdapter.discoverable = !BluetoothAdapter.discoverable
+    val heartbeat = staticCFunction<gpointer?, gboolean>{
+        try {
+            Uart.sendHeartBeat()
+        } catch (e: Exception) {
+            e.stackTraceToString().error()
+        }
         1
     }
-//    g_timeout_add(1000, timeoutFunction, null)
+    g_timeout_add(1000, heartbeat, null)
+
     "Starting main loop".info()
     g_main_loop_run(mainLoop)
 }

@@ -3,7 +3,9 @@ package cz.fjerabek.thr.file
 import com.badoo.reaktive.utils.atomic.AtomicReference
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
+import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.midi.messages.PresetMessage
+import cz.fjerabek.thr.presetsFilePath
 import cz.fjerabek.thr.serializer
 import kotlinx.cinterop.*
 import kotlinx.serialization.PolymorphicSerializer
@@ -15,7 +17,7 @@ object PresetsManager {
 
     fun savePresets(presetFilePath: String, presets: List<PresetMessage>) {
         val file = fopen(presetFilePath, "wb")
-        if (file == NULL) {
+        if (file == null) {
             "PresetManager save error: ${strerror(errno)?.toKString()}".error()
         } else {
             val string = serializer.encodeToString(presets)
@@ -24,11 +26,11 @@ object PresetsManager {
         }
     }
 
-    fun loadPresets(presetFilePath: String): List<PresetMessage> {
+    fun loadPresets(presetFilePath: String): List<PresetMessage>? {
         val file = fopen(presetFilePath, "rb")
-        if (file == NULL) {
-            "PresetManager load error: ${strerror(errno)?.toKString()}".error()
-            return emptyList()
+        if (file == null) {
+            "PresetManager load error: ${strerror(errno)?.toKString()}".warn()
+            return null
         }
         fseek(file, 0, SEEK_END)
         val length: Long = ftell(file).convert()

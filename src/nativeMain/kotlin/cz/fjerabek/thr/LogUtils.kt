@@ -67,6 +67,7 @@ object LogUtils {
 
     private fun log(level: LogLevel, message: String) {
         val timeString = ByteArray(9)
+        val indentedMessage = message.replace("\n", "\n\t\t\t")
         memScoped {
             val time: time_tVar = alloc()
             time(time.ptr)
@@ -74,7 +75,7 @@ object LogUtils {
                 strftime(it.addressOf(0), 9, "%H:%M:%S", localtime(time.ptr))
             }
         }
-        println("${timeString.toKString()}\t[$level]\t${message}")
+        println("${timeString.toKString()}\t[$level]\t${indentedMessage}")
     }
 
     private fun color(color: ANSIColor, string: () -> String) = "$ANSI_ESCAPE${color.ansi}m${string()}$ANSI_RESET"
