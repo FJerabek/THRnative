@@ -1,0 +1,3 @@
+[submodule "src/nativeMain/kotlin/cz/fjerabek/thr/data"]
+	path = src/nativeMain/kotlin/cz/fjerabek/thr/data
+	url = git@github.com:FJerabek/THR-common.git
