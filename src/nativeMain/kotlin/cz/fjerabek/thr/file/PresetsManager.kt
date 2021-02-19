@@ -1,14 +1,10 @@
 package cz.fjerabek.thr.file
 
-import com.badoo.reaktive.utils.atomic.AtomicReference
-import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.LogUtils.warn
-import cz.fjerabek.thr.midi.messages.PresetMessage
-import cz.fjerabek.thr.presetsFilePath
+import cz.fjerabek.thr.data.midi.PresetMessage
 import cz.fjerabek.thr.serializer
 import kotlinx.cinterop.*
-import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import platform.posix.*

@@ -5,6 +5,7 @@ import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.ioScheduler
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.warn
+import cz.fjerabek.thr.data.bluetooth.IBluetoothMessage
 import cz.fjerabek.thr.serializer
 import kotlinx.cinterop.*
 import kotlinx.serialization.PolymorphicSerializer

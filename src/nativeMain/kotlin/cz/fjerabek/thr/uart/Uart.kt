@@ -3,12 +3,12 @@ package cz.fjerabek.thr.uart
 import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.ioScheduler
-import com.badoo.reaktive.scheduler.newThreadScheduler
 import com.badoo.reaktive.utils.atomic.AtomicReference
 import com.badoo.reaktive.utils.atomic.getAndUpdate
 import termios.setupSerial
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
+import cz.fjerabek.thr.data.uart.*
 import glib.*
 import kotlinx.cinterop.*
 import platform.posix.*
@@ -20,13 +20,57 @@ class UartReadException(message: String) : UartException(message)
 @SharedImmutable
 val uartQueue = AtomicReference<List<String>>(listOf())
 
+
+    fun UartMessage.Companion.fromString(string: String): UartMessage {
+        val params = string.split(";")
+
+        when(params[0].trim()) {
+            "\$btn" -> {
+                return ButtonMessage(
+                    params[1].toInt(),
+                    params[2].trim().toInt() == 1,
+                    if (params.size == 4) params[3].trim().toLong() else 0L
+                )
+            }
+            "\$ok" -> {
+                var cmd: String = ""
+                uartQueue.getAndUpdate {
+                    it.toMutableList().apply { cmd = removeLast() }
+                }
+                when (cmd) {
+                    CMD_SHUTDOWN -> {
+                        return ShutdownMessage(true);
+                    }
+                    CMD_FW -> {
+                        return FWVersionMessage(
+                            params[1].trim().toInt(),
+                            params[2].trim().toInt(),
+                            params[3].trim().toInt()
+                        )
+                    }
+                    CMD_STATUS -> {
+                        return StatusMessage(
+                            params[1].trim().toLong(),
+                            params[2].trim().toInt(),
+                            ECharging.fromValue(params[3])!!,
+                            params[4].trim().toInt()
+                        )
+                    }
+                    CMD_HBT -> { return HbtMessage()
+                    }
+                    else -> {
+                        throw UnsupportedOperationException("Received invalid message")
+                    }
+                }
+            }
+            else -> {
+                throw UnsupportedOperationException("Received invalid message: $params")
+            }
+        }
+    }
+
 object Uart {
     private const val UART_FILE = "/dev/ttyS0"
-    const val CMD_FW = "\$fwv\r\n"
-    const val CMD_STATUS = "\$sta\r\n"
-    const val CMD_HBT = "\$hbt\r\n"
-    const val CMD_SHUTDOWN = "\$off\r\n"
-
     private var uart: CPointer<GIOChannel>?
     private val fd: Int
 

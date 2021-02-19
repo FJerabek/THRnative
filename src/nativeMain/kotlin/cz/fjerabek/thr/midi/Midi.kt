@@ -3,10 +3,12 @@ package cz.fjerabek.thr.midi
 import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.newThreadScheduler
-import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.info
 import cz.fjerabek.thr.LogUtils.warn
-import cz.fjerabek.thr.midi.messages.*
+import cz.fjerabek.thr.data.midi.ChangeMessage
+import cz.fjerabek.thr.data.midi.HeartBeatMessage
+import cz.fjerabek.thr.data.midi.IMidiMessage
+import cz.fjerabek.thr.data.midi.PresetMessage
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
@@ -56,7 +58,7 @@ class Midi(port: String) {
 
     private fun createMessage(data: ByteArray): IMidiMessage? {
         return when {
-            data contentEquals heartbeatData -> {
+            data contentEquals HeartBeatMessage.heartbeatData -> {
                 HeartBeatMessage(data)
             }
             data.size > changePrefix.size &&
@@ -140,7 +142,6 @@ class Midi(port: String) {
             0x7f
         )
         private val changePrefix = byteArrayOf(0x43, 0x7D, 0x10, 0x41, 0x30, 0x01)
-        val heartbeatData = byteArrayOf(0x43, 0x7D, 0x60, 0x44, 0x54, 0x41, 0x31)
         const val DISCOVERY_DELAY = 1u
 
         fun waitForConnection(port: String): Midi {
