@@ -78,7 +78,9 @@ object PinAgent {
                 "RequestPasskey" -> { }
                 "DisplayPasskey" -> { }
                 "RequestConfirmation" -> { }
-                "AuthorizeService" -> { }
+                "AuthorizeService" -> {
+                        g_dbus_method_invocation_return_value(invocation, null)
+                }
                 "RequestAuthorization" -> {
                     g_variant_get(parameters, "(o)", device.ptr)
                     requestAuthorization(device.value!!.toKString(), invocation)

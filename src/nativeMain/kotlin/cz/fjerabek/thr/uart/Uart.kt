@@ -6,7 +6,6 @@ import com.badoo.reaktive.scheduler.ioScheduler
 import com.badoo.reaktive.utils.atomic.AtomicReference
 import com.badoo.reaktive.utils.atomic.getAndUpdate
 import termios.setupSerial
-import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.data.uart.*
 import glib.*
@@ -21,53 +20,54 @@ class UartReadException(message: String) : UartException(message)
 val uartQueue = AtomicReference<List<String>>(listOf())
 
 
-    fun UartMessage.Companion.fromString(string: String): UartMessage {
-        val params = string.split(";")
+fun UartMessage.Companion.fromString(string: String): UartMessage {
+    val params = string.split(";")
 
-        when(params[0].trim()) {
-            "\$btn" -> {
-                return ButtonMessage(
-                    params[1].toInt(),
-                    params[2].trim().toInt() == 1,
-                    if (params.size == 4) params[3].trim().toLong() else 0L
-                )
+    when (params[0].trim()) {
+        "\$btn" -> {
+            return ButtonMessage(
+                params[1].toInt(),
+                params[2].trim().toInt() == 1,
+                if (params.size == 4) params[3].trim().toLong() else 0L
+            )
+        }
+        "\$ok" -> {
+            var cmd: String = ""
+            uartQueue.getAndUpdate {
+                it.toMutableList().apply { cmd = removeLast() }
             }
-            "\$ok" -> {
-                var cmd: String = ""
-                uartQueue.getAndUpdate {
-                    it.toMutableList().apply { cmd = removeLast() }
+            when (cmd) {
+                CMD_SHUTDOWN -> {
+                    return ShutdownMessage(true);
                 }
-                when (cmd) {
-                    CMD_SHUTDOWN -> {
-                        return ShutdownMessage(true);
-                    }
-                    CMD_FW -> {
-                        return FWVersionMessage(
-                            params[1].trim().toInt(),
-                            params[2].trim().toInt(),
-                            params[3].trim().toInt()
-                        )
-                    }
-                    CMD_STATUS -> {
-                        return StatusMessage(
-                            params[1].trim().toLong(),
-                            params[2].trim().toInt(),
-                            ECharging.fromValue(params[3])!!,
-                            params[4].trim().toInt()
-                        )
-                    }
-                    CMD_HBT -> { return HbtMessage()
-                    }
-                    else -> {
-                        throw UnsupportedOperationException("Received invalid message")
-                    }
+                CMD_FW -> {
+                    return FWVersionMessage(
+                        params[1].trim().toInt(),
+                        params[2].trim().toInt(),
+                        params[3].trim().toInt()
+                    )
                 }
-            }
-            else -> {
-                throw UnsupportedOperationException("Received invalid message: $params")
+                CMD_STATUS -> {
+                    return StatusMessage(
+                        params[1].trim().toLong(),
+                        params[2].trim().toInt(),
+                        ECharging.fromValue(params[3])!!,
+                        params[4].trim().toInt()
+                    )
+                }
+                CMD_HBT -> {
+                    return HbtMessage()
+                }
+                else -> {
+                    throw UnsupportedOperationException("Received invalid message")
+                }
             }
         }
+        else -> {
+            throw UnsupportedOperationException("Received invalid message: $params")
+        }
     }
+}
 
 object Uart {
     private const val UART_FILE = "/dev/ttyS0"
@@ -75,13 +75,13 @@ object Uart {
     private val fd: Int
 
     init {
-        "Opening UART serial".debug()
+//        "Opening UART serial".debug()
         fd = open(UART_FILE, O_RDWR or O_NOCTTY or O_SYNC)
         if (fd == -1) {
             "Error uart opening failed: ${strerror(errno)}".error()
             uart = null
         } else {
-            "Serial opened fd: $fd".debug()
+//            "Serial opened fd: $fd".debug()
             setupSerial(fd)
             uart = g_io_channel_unix_new(fd)
 //        g_io_channel_set_buffered(uart, 1/*true*/)
@@ -115,13 +115,18 @@ object Uart {
             val message = allocPointerTo<gcharVar>()
             buffer.usePinned {
                 while (true) {
-                    g_io_channel_read_line(uart, message.ptr, read.ptr, null, error.ptr)
-                    error.value?.let {
-                        throw UartReadException(it.pointed.message?.toKString() ?: "UART read error without message")
-                    }
-                    message.value?.let {
-                        "UART receive ${it.toKString()}".debug()
-                        observable.onNext(UartMessage.fromString(it.toKString()))
+                    try {
+                        g_io_channel_read_line(uart, message.ptr, read.ptr, null, error.ptr)
+                        error.value?.let {
+                            throw UartReadException(
+                                it.pointed.message?.toKString() ?: "UART read error without message"
+                            )
+                        }
+                        message.value?.let {
+                            observable.onNext(UartMessage.fromString(it.toKString()))
+                        }
+                    } catch (e: Exception) {
+                        e.stackTraceToString().error()
                     }
                 }
             }
@@ -130,30 +135,30 @@ object Uart {
 
     fun requestFirmware() {
         uartQueue.getAndUpdate {
-            it.toMutableList().apply { add(CMD_FW) }
+            it.toMutableList().apply { add(UartMessage.CMD_FW) }
         }
-        writeString(CMD_FW)
+        writeString(UartMessage.CMD_FW)
     }
 
     fun requestStatus() {
         uartQueue.getAndUpdate {
-            it.toMutableList().apply { add(CMD_STATUS) }
+            it.toMutableList().apply { add(UartMessage.CMD_STATUS) }
         }
-        writeString(CMD_STATUS)
+        writeString(UartMessage.CMD_STATUS)
     }
 
     fun sendHeartBeat() {
         uartQueue.getAndUpdate {
-            it.toMutableList().apply { add(CMD_HBT) }
+            it.toMutableList().apply { add(UartMessage.CMD_HBT) }
         }
-        writeString(CMD_HBT)
+        writeString(UartMessage.CMD_HBT)
     }
 
     fun requestShutdown() {
         uartQueue.getAndUpdate {
-            it.toMutableList().apply { add(CMD_SHUTDOWN) }
+            it.toMutableList().apply { add(UartMessage.CMD_SHUTDOWN) }
         }
-        writeString(CMD_SHUTDOWN)
+        writeString(UartMessage.CMD_SHUTDOWN)
     }
 
     fun close() {

@@ -1,5 +1,6 @@
 package cz.fjerabek.thr.bluetooth
 
+//import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.bluetoothConnection
@@ -7,6 +8,8 @@ import cz.fjerabek.thr.glib.DBusUnknownMethodException
 import cz.fjerabek.thr.glib.GLib
 import glib.*
 import kotlinx.cinterop.*
+import platform.posix.FIONBIO
+import platform.posix.ioctl
 
 open class BluetoothException(message: String) : Exception(message)
 class BluetoothConnectionClosedException(message: String) : BluetoothException(message)
@@ -71,7 +74,8 @@ object Bluetooth {
                     g_variant_get(parameters, "(oha{sv})", caller.ptr, fdIndex, properties.ptr)
                     val fdList = g_dbus_message_get_unix_fd_list(g_dbus_method_invocation_get_message(invocation))
                     val fd = g_unix_fd_list_get(fdList, fdIndex.value, null)
-                    "Bluetooth file descriptor: $fd".debug()
+//                    "Bluetooth file descriptor: $fd".debug()
+                    ioctl(fd, FIONBIO, 0); //Enable blocking mode
                     bluetoothConnection(BluetoothConnection(fd))
                 }
                 "Release" -> {

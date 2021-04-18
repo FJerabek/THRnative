@@ -80,11 +80,13 @@ val serializerModule = SerializersModule {
         subclass(WideStereo::class)
         subclass(ConnectedRq::class)
         subclass(Connected::class)
+        subclass(SetPresetsRq::class)
+        subclass(CurrentPresetIndexRq::class)
     }
 }
 
 @ThreadLocal
 val serializer = Json {
     serializersModule = serializerModule
-    prettyPrint = true
+    prettyPrint = false
 }

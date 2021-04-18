@@ -4,6 +4,7 @@ import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.ioScheduler
 import cz.fjerabek.thr.LogUtils.debug
+//import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.data.bluetooth.IBluetoothMessage
 import cz.fjerabek.thr.serializer
@@ -24,17 +25,18 @@ class BluetoothConnection(
 
     private fun setToBlockingMode(fd: Int) {
         var options = fcntl(fd, F_GETFL)
-        if(options < 0) {
+        if (options < 0) {
             throw BluetoothException("Unable to get bluetooth socket options")
         }
         options = options.and(O_NONBLOCK.inv())
 
-        if(fcntl(fd, F_SETFL, options) < 0) {
+        if (fcntl(fd, F_SETFL, options) < 0) {
             throw BluetoothException("Unable to set bluetooth socket options")
         }
     }
+
     private fun read(): ByteArray {
-        val buffer = ByteArray(2048)
+        val buffer = ByteArray(65535)
         var readBytes = 0L
         buffer.usePinned {
             readBytes = read(socketDescriptor, it.addressOf(0), buffer.size.convert()).toLong()
@@ -48,18 +50,29 @@ class BluetoothConnection(
         return read().toKString()
     }
 
-    fun startReceiver() = observable<IBluetoothMessage> {
-        "Starting bluetooth receiver".debug()
+    fun startReceiver() = observable<IBluetoothMessage> { emitter ->
+//        "Starting bluetooth receiver".debug()
+        val builder = StringBuilder()
         while (true) {
             try {
-                val stringMessage = readString()
-                "Received: $stringMessage".debug()
-                val message = serializer.decodeFromString(
-                    PolymorphicSerializer(IBluetoothMessage::class),
-                    stringMessage
-                )
-                debug { message }
-                it.onNext(message)
+                builder.append(readString())
+                if (builder.contains('\n')) {
+                    val lastMessageDelimiter = builder.lastIndexOf('\n')
+                    if(lastMessageDelimiter == -1) {
+                        continue
+                    }
+
+                    val messages = builder.substring(0..lastMessageDelimiter)
+                    builder.deleteRange(0, lastMessageDelimiter + 1)
+                    val split = messages.split('\n').filterNot { it.trim().isEmpty() }
+                    split.forEach messageSplit@{
+                        val message = serializer.decodeFromString(
+                            PolymorphicSerializer(IBluetoothMessage::class),
+                            it
+                        )
+                        emitter.onNext(message)
+                    }
+                }
             } catch (e: SerializationException) {
                 "Received unserializable message".warn()
             }
@@ -75,7 +88,7 @@ class BluetoothConnection(
     }
 
     fun writeString(message: String) {
-        write(message = message.encodeToByteArray())
+        write(message = "$message \n".encodeToByteArray())
     }
 
     fun sendMessage(message: IBluetoothMessage) {

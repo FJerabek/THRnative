@@ -36,24 +36,31 @@ import kotlin.native.concurrent.SharedImmutable
 // Midi device
 @SharedImmutable
 val midi = AtomicReference<Midi?>(null)
+
 //Connected bluetooth device
 @ExperimentalUnsignedTypes
 @SharedImmutable
 val bluetoothConnection: AtomicReference<BluetoothConnection?> = AtomicReference(null)
+
 //Loaded presets
 @SharedImmutable
 val presets = AtomicReference<List<PresetMessage>>(listOf())
+
 //Midi port file location
 @SharedImmutable
 val midiPort = AtomicReference("/dev/midi3")
+
 //Preset save file location
 @SharedImmutable
 val presetsFilePath = AtomicReference("presets.json")
+
 //Current index of selected preset -1 is not saved custom
 @SharedImmutable
 val currentPreset = AtomicInt(-1)
+
 @SharedImmutable
 val leftButtonTimeoutId = AtomicLong(-1)
+
 @SharedImmutable
 val rightButtonTimeoutId = AtomicLong(-1)
 
@@ -133,13 +140,13 @@ fun bluetoothError(e: Throwable) {
  * Called when bluetooth message received
  */
 fun bluetoothMessage(message: IBluetoothMessage) {
-    "Bluetooth received: $message".debug()
     when (message) {
         is IMidiMessage -> midi.value?.sendMessage(message)
         is FwVersionRq -> Uart.requestFirmware()
         is HwStatusRq -> Uart.requestStatus()
         is PresetsRq -> bluetoothConnection.value?.sendMessage(PresetsResponse(presets.value))
         is CurrentPresetRq -> midi.value?.requestDump()
+//        is CurrentPresetIndexRq -> bluetoothConnection.value?.sendMessage(PresetSelect(currentPreset.value))
         is Lamp -> midi.value?.lamp(message.on)
         is WideStereo -> midi.value?.wideStereo(message.on)
         is ConnectedRq -> bluetoothConnection.value?.sendMessage(Connected(midi.value != null))
@@ -167,10 +174,16 @@ fun bluetoothMessage(message: IBluetoothMessage) {
             PresetsManager.savePresets(presetsFilePath.value, presets.value)
         }
         is PresetSelect -> {
-            if (message.index >= presets.value.size) {
-                "Invalid preset index: ${message.index} preset size: ${presets.value.size}".error()
-            } else {
-                midi.value?.sendMessage(presets.value[message.index])
+            when {
+                message.index == -1 -> {
+                    currentPreset.value = -1
+                }
+                message.index >= presets.value.size -> {
+                    "Invalid preset index: ${message.index} preset size: ${presets.value.size}".error()
+                }
+                else -> {
+                    midi.value?.sendMessage(presets.value[message.index])
+                }
             }
         }
     }
@@ -261,7 +274,8 @@ fun uartMessageReceived(message: UartMessage) {
             "Shutting down".warn()
             system("shutdown -P now")
         }
-        is HbtMessage -> {}
+        is HbtMessage -> {
+        }
     }
 }
 
@@ -298,14 +312,14 @@ fun main(args: Array<String>) {
     })
 
     PresetsManager.loadPresets(presetsFilePath.value)
-    ?.let { loadedPresets ->
-        loadedPresets.toMutableList().let {
-            "Loaded ${loadedPresets.size} presets".info()
-            presets.update {
-                loadedPresets
+        ?.let { loadedPresets ->
+            loadedPresets.toMutableList().let {
+                "Loaded ${loadedPresets.size} presets".info()
+                presets.update {
+                    loadedPresets
+                }
             }
-        }
-    } ?: run{
+        } ?: run {
         "Creating preset save file".info()
         PresetsManager.savePresets(presetsFilePath.value, emptyList())
     }
@@ -319,7 +333,7 @@ fun main(args: Array<String>) {
     "Registering Bluetooth agent".info()
     PinAgent.registerAgent()
 
-    val heartbeat = staticCFunction<gpointer?, gboolean>{
+    val heartbeat = staticCFunction<gpointer?, gboolean> {
         try {
             Uart.sendHeartBeat()
         } catch (e: Exception) {
@@ -327,7 +341,7 @@ fun main(args: Array<String>) {
         }
         1
     }
-    g_timeout_add(1000, heartbeat, null)
+//    g_timeout_add(1000, heartbeat, null)
 
     "Starting main loop".info()
     g_main_loop_run(mainLoop)
