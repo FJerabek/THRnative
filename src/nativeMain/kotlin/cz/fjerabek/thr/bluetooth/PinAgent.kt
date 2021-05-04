@@ -1,16 +1,15 @@
 package cz.fjerabek.thr.bluetooth
 
 import cz.fjerabek.thr.LogUtils.debug
-import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.glib.DBusUnknownMethodException
 import cz.fjerabek.thr.glib.GLib
 import glib.*
 import kotlinx.cinterop.*
-import platform.posix.uint32_t
 
 /**
  * Object representing pin agent without need of pin authentication.
  */
+@ExperimentalUnsignedTypes
 object PinAgent {
     private const val AGENT_DBUS_PATH = "/cz/fjerabek/thr/agent"
     private const val DBUS_AGENT_OBJECT_DESCRIPTION =

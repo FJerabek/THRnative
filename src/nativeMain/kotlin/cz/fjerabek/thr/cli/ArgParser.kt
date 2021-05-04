@@ -103,6 +103,7 @@ class ArgParser(private val args: Array<String>) {
      * @param longName long name of parameter ex. --help
      * @param required if parameter is required. If true the parameter will throw [RequiredArgumentNotFoundException] if its not present
      */
+    @Suppress("UNCHECKED_CAST") //No way to check without inlining the function
     fun <T> option(
         argType: ArgType,
         shortName: Char? = null,

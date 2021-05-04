@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform") version "1.4.30"
     kotlin("plugin.serialization") version "1.4.21"
+    id("org.jetbrains.dokka") version "1.4.32"
 }
 group = "cz.fjerabek"
 version = "1.0-SNAPSHOT"

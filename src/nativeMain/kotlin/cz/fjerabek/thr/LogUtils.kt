@@ -4,6 +4,7 @@ import kotlinx.cinterop.*
 import platform.posix.*
 import kotlin.native.concurrent.AtomicReference
 
+@ExperimentalUnsignedTypes
 object LogUtils {
     enum class LogLevel(private val color: ANSIColor) {
         DEBUG(ANSIColor.WHITE),
@@ -12,10 +13,10 @@ object LogUtils {
         ERROR(ANSIColor.RED);
 
         override fun toString(): String {
-            return super.toString().color(color);
+            return super.toString().color(color)
         }
     }
-     var logLevel = AtomicReference(LogLevel.INFO)
+     val logLevel = AtomicReference(LogLevel.INFO)
 
     fun debug(message: () -> Any) {
         logAsync(LogLevel.DEBUG, message().toString())

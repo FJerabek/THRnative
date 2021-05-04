@@ -35,49 +35,75 @@ import platform.posix.*
 import kotlin.native.concurrent.AtomicInt
 import kotlin.native.concurrent.SharedImmutable
 
-// Midi device
+/**
+ * Midi device
+ */
 @SharedImmutable
-val midi = AtomicReference<Midi?>(null)
+private val midi = AtomicReference<Midi?>(null)
 
-//Connected bluetooth device
+/**
+ * Connected bluetooth device
+ */
 @ExperimentalUnsignedTypes
 @SharedImmutable
-val bluetoothConnection: AtomicReference<BluetoothConnection?> = AtomicReference(null)
+private val bluetoothConnection: AtomicReference<BluetoothConnection?> = AtomicReference(null)
 
-//Loaded presets
+/**
+ * Loaded presets
+ */
 @SharedImmutable
-val presets = AtomicReference<List<PresetMessage>>(listOf())
+private val presets = AtomicReference<List<PresetMessage>>(listOf())
 
-//Midi port file location
+/**
+ * Midi port file location
+ */
 @SharedImmutable
-val midiPort = AtomicReference("/dev/midi3")
+private val midiPort = AtomicReference("/dev/midi3")
 
-//Preset save file location
+/**
+ * Preset save file location
+ */
 @SharedImmutable
-val presetsFilePath = AtomicReference("presets.json")
+private val presetsFilePath = AtomicReference("presets.json")
 
-//Current index of selected preset -1 is not saved custom
-@SharedImmutable
-val currentPreset = AtomicInt(-1)
-
-@SharedImmutable
-val leftButtonTimeoutId = AtomicLong(-1)
-
-@SharedImmutable
-val rightButtonTimeoutId = AtomicLong(-1)
+/**
+ * Current index of selected preset -1 is not saved custom
+ */
 
 @SharedImmutable
-val isCliRq = AtomicBoolean(false)
+private val currentPreset = AtomicInt(-1)
 
-@ExperimentalUnsignedTypes
-fun ByteArray.toHexString() = asUByteArray().joinToString(" ") { it.toString(16).padStart(2, '0') }
+/**
+ * Id of left button timeout task
+ */
+@SharedImmutable
+private val leftButtonTimeoutId = AtomicLong(-1)
 
-val mainLoop = g_main_loop_new(null, 0)
+/**
+ * Id of right button timeout task
+ */
+@SharedImmutable
+private val rightButtonTimeoutId = AtomicLong(-1)
 
+/**
+ * Specifies that next UART request is from CLI
+ */
+@SharedImmutable
+private val isCliRq = AtomicBoolean(false)
+
+/**
+ * Main loop reference
+ */
+private val mainLoop = g_main_loop_new(null, 0)
+
+/**
+ * Default value for preset file argument
+ */
 const val PRESETS_DEFAULT = "presets.json"
 
 /**
  * Called on midi message receive
+ * @param message received message
  */
 @ExperimentalUnsignedTypes
 fun onMidiMessage(message: IMidiMessage) {
@@ -99,7 +125,9 @@ fun onMidiMessage(message: IMidiMessage) {
 
 /**
  * Called on midi read/write error
+ * @param throwable thrown exception
  */
+@ExperimentalUnsignedTypes
 fun onMidiError(throwable: Throwable) {
     when (throwable) {
         is MidiDisconnectedException -> {
@@ -115,7 +143,9 @@ fun onMidiError(throwable: Throwable) {
 
 /**
  * Starts connecting to THR midi device.
+ * @param port path to /dev file of midi device
  */
+@ExperimentalUnsignedTypes
 fun midiConnect(port: String) {
     observable<Midi> {
         it.onNext(Midi.waitForConnection(port))
@@ -132,7 +162,9 @@ fun midiConnect(port: String) {
 
 /**
  * Called on bluetooth read/write error
+ * @param e exception
  */
+@ExperimentalUnsignedTypes
 fun bluetoothError(e: Throwable) {
     when (e) {
         is BluetoothConnectionClosedException -> {
@@ -145,7 +177,9 @@ fun bluetoothError(e: Throwable) {
 
 /**
  * Called when bluetooth message received
+ * @param message received message
  */
+@ExperimentalUnsignedTypes
 fun bluetoothMessage(message: IBluetoothMessage) {
     when (message) {
         is IMidiMessage -> midi.value?.sendMessage(message)
@@ -153,7 +187,7 @@ fun bluetoothMessage(message: IBluetoothMessage) {
         is HwStatusRq -> Uart.requestStatus()
         is PresetsRq -> bluetoothConnection.value?.sendMessage(PresetsResponse(presets.value))
         is CurrentPresetRq -> midi.value?.requestDump()
-//        is CurrentPresetIndexRq -> bluetoothConnection.value?.sendMessage(PresetSelect(currentPreset.value))
+        is CurrentPresetIndexRq -> bluetoothConnection.value?.sendMessage(PresetSelect(currentPreset.value))
         is Lamp -> midi.value?.lamp(message.on)
         is WideStereo -> midi.value?.wideStereo(message.on)
         is ConnectedRq -> bluetoothConnection.value?.sendMessage(Connected(midi.value != null))
@@ -201,6 +235,7 @@ fun bluetoothMessage(message: IBluetoothMessage) {
  * Called when bluetooth connection is accepted
  * @param connection accepted connection
  */
+@ExperimentalUnsignedTypes
 fun bluetoothConnection(connection: BluetoothConnection) {
     "Bluetooth connected".info()
     bluetoothConnection.value = connection
@@ -213,6 +248,7 @@ fun bluetoothConnection(connection: BluetoothConnection) {
  * Called on uart message received
  * @param message received message
  */
+@ExperimentalUnsignedTypes
 fun uartMessageReceived(message: UartMessage) {
     when (message) {
         is ButtonMessage -> {
@@ -297,6 +333,7 @@ fun uartMessageReceived(message: UartMessage) {
 /**
  * Sets up uart receiver
  */
+@ExperimentalUnsignedTypes
 fun setupUartReceiver() {
     Uart.startReceiver()
         .subscribeOn(ioScheduler)
@@ -312,32 +349,37 @@ fun setupUartReceiver() {
 /**
  * Processes cli command
  */
+@ExperimentalUnsignedTypes
 fun cliCommandProcessor(command: CliCommand) {
-    when (command) {
-        is HelpCommand -> {
-            println(
-                "Command line interface is useful for getting basic information from THR-comm. Commands are: \n" +
-                        "help, h\t\tPrints this text \n" +
-                        "status\t\tPrints system status (uptime, battery %, charging state, current in mA) \n" +
-                        "version\t\tPrints current FW version \n" +
-                        "shutdown\tShuts down system \n" +
-                        "activeIndex, ai\tPrints active preset index"
-            )
+    try {
+        when (command) {
+            is HelpCommand -> {
+                println(
+                    "Command line interface is useful for getting basic information from THR-comm. Commands are: \n" +
+                            "help, h\t\tPrints this text \n" +
+                            "status\t\tPrints system status (uptime, battery %, charging state, current in mA) \n" +
+                            "version\t\tPrints current FW version \n" +
+                            "shutdown\tShuts down system \n" +
+                            "activeIndex, ai\tPrints active preset index"
+                )
+            }
+            is CurrentCommand -> {
+                isCliRq.value = true
+                Uart.requestStatus()
+            }
+            is VersionCommand -> {
+                isCliRq.value = true
+                Uart.requestFirmware()
+            }
+            is ShutdownCommand -> {
+                Uart.requestShutdown()
+            }
+            is GetActivePresetIndexCommand -> {
+                println(currentPreset.value)
+            }
         }
-        is CurrentCommand -> {
-            isCliRq.value = true
-            Uart.requestStatus()
-        }
-        is VersionCommand -> {
-            isCliRq.value = true
-            Uart.requestFirmware()
-        }
-        is ShutdownCommand -> {
-            Uart.requestShutdown()
-        }
-        is GetActivePresetIndexCommand -> {
-            println(currentPreset.value)
-        }
+    } catch (e: Exception) {
+        "Exception processing command: $e".error()
     }
 }
 
@@ -351,22 +393,27 @@ fun main(args: Array<String>) {
     val disableUart: Boolean by argParser.option(ArgType.BOOLEAN, null, "disableUart", "disables UART communication")
     val disableHb: Boolean by argParser.option(ArgType.BOOLEAN, null, "disableHeartBeat", "disables sending HeartBeat")
     val enableConsole: Boolean by argParser.option(ArgType.BOOLEAN, 'c', "console", "enables development console")
-    val presetsFile: String by argParser.option(ArgType.STRING, 'p', "presetFile", "specifies presets file default is $PRESETS_DEFAULT")
+    val presetsFile: String by argParser.option(
+        ArgType.STRING,
+        'p',
+        "presetFile",
+        "specifies presets file default is $PRESETS_DEFAULT"
+    )
     val debug: Boolean by argParser.option(ArgType.BOOLEAN, 'd', "debug", "enables debug log output")
 
-    if(help) {
+    if (help) {
         argParser.printHelp("THR-comm", "Communicate with THR 10 guitar combo and mobile configuration app")
         return
     }
 
     try {
         argParser.inject()
-    } catch (e : Exception) {
+    } catch (e: Exception) {
         println("Invalid parameters try flag -h or --help for more info")
         exit(1)
     }
 
-    if(debug) {
+    if (debug) {
         LogUtils.logLevel.value = LogUtils.LogLevel.DEBUG
     }
 
@@ -382,9 +429,10 @@ fun main(args: Array<String>) {
     """.trimIndent().debug()
 
     signal(SIGINT, staticCFunction<Int, Unit> {
-        Uart.close()
+
         g_main_loop_quit(mainLoop)
         g_main_loop_unref(mainLoop)
+        Uart.close()
         exit(0)
     })
 
@@ -401,15 +449,21 @@ fun main(args: Array<String>) {
         PresetsManager.savePresets(presetsFilePath.value, emptyList())
     }
 
-    "Starting MIDI connector".info()
-    midiConnect(midiPort.value)
-
-    if(disableUart) {
+    if (disableUart) {
         "UART receiver disabled".warn()
     } else {
-        "Setting up UART receiver".info()
-        setupUartReceiver()
+        try {
+            "Setting up UART receiver".info()
+            setupUartReceiver()
+        } catch (e: UartException) {
+            "Error setting up UART ${e.message}".error()
+            "Uart exception $e".debug()
+            return
+        }
     }
+
+    "Starting MIDI connector".info()
+    midiConnect(midiPort.value)
 
     "Registering Bluetooth SDP record".info()
     Bluetooth.sdpRegister() //Starts accepting connections
@@ -425,7 +479,7 @@ fun main(args: Array<String>) {
         1
     }
 
-    if(disableHb || disableUart){
+    if (disableHb || disableUart) {
         "Heartbeat sender is disabled".warn()
     } else {
         "Starting heartbeat sender".info()

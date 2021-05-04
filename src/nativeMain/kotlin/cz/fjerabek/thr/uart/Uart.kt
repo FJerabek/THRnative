@@ -52,13 +52,13 @@ fun UartMessage.Companion.fromString(string: String): UartMessage {
             )
         }
         "\$ok" -> {
-            var cmd: String = ""
+            var cmd = ""
             uartQueue.getAndUpdate {
                 it.toMutableList().apply { cmd = removeLast() }
             }
             when (cmd) {
                 CMD_SHUTDOWN -> {
-                    return ShutdownMessage(true);
+                    return ShutdownMessage(true)
                 }
                 CMD_FW -> {
                     return FWVersionMessage(
@@ -92,31 +92,32 @@ fun UartMessage.Companion.fromString(string: String): UartMessage {
 /**
  * Object representing uart port
  */
+@ExperimentalUnsignedTypes
 object Uart {
     private const val UART_FILE = "/dev/ttyS0"
-    private var uart: CPointer<GIOChannel>?
+    private val uart: CPointer<GIOChannel>?
     private val fd: Int = open(UART_FILE, O_RDWR or O_NOCTTY or O_SYNC)
 
     init {
         "Opening UART serial".debug()
-        if (fd == -1) {
-            "Error uart opening failed: ${strerror(errno)}".error()
-            uart = null
+        uart = if (fd == -1) {
+            throw UartException("Opening failed: ${strerror(errno)?.toKString()}")
+            null
         } else {
             "Serial opened fd: $fd".debug()
             setupSerial(fd)
-            uart = g_io_channel_unix_new(fd)
-//        g_io_channel_set_buffered(uart, 1/*true*/)
+            g_io_channel_unix_new(fd)
+    //        g_io_channel_set_buffered(uart, 1/*true*/)
         }
     }
 
     /**
      * Writes string to UART
-     * @param string message to write
+     * @param message string message to write
      */
     private fun writeString(message: String): Int = memScoped {
         val buffer = message.encodeToByteArray()
-        var written = -1;
+        var written = -1
         buffer.usePinned {
             written = write(fd, it.addressOf(0), message.length.convert()).toInt()
         }
