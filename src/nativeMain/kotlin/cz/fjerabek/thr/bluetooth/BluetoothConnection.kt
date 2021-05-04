@@ -3,8 +3,6 @@ package cz.fjerabek.thr.bluetooth
 import com.badoo.reaktive.observable.observable
 import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.ioScheduler
-import cz.fjerabek.thr.LogUtils.debug
-//import cz.fjerabek.thr.LogUtils.debug
 import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.data.bluetooth.IBluetoothMessage
 import cz.fjerabek.thr.serializer
@@ -13,6 +11,10 @@ import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.SerializationException
 import platform.posix.*
 
+/**
+ * Class representing bluetooth connection
+ * @param socketDescriptor socket file descriptor for sending and receiving data
+ */
 @ExperimentalUnsignedTypes
 class BluetoothConnection(
     private val socketDescriptor: Int
@@ -23,6 +25,10 @@ class BluetoothConnection(
         }
     }
 
+    /**
+     * Sets file descriptor to blocking mode
+     * @param fd socket file descriptor
+     */
     private fun setToBlockingMode(fd: Int) {
         var options = fcntl(fd, F_GETFL)
         if (options < 0) {
@@ -35,6 +41,10 @@ class BluetoothConnection(
         }
     }
 
+    /**
+     * Reads byte array from socket
+     * @return received data
+     */
     private fun read(): ByteArray {
         val buffer = ByteArray(65535)
         var readBytes = 0L
@@ -46,10 +56,18 @@ class BluetoothConnection(
     }
 
 
+    /**
+     * Receives value as string
+     * @return received string
+     */
     private fun readString(): String {
         return read().toKString()
     }
 
+    /**
+     * Starts bluetooth receiver, which constantly receives for bluetooth messages
+     * @return observable value. Called when bluetooth message is received
+     */
     fun startReceiver() = observable<IBluetoothMessage> { emitter ->
 //        "Starting bluetooth receiver".debug()
         val builder = StringBuilder()
@@ -79,6 +97,10 @@ class BluetoothConnection(
         }
     }.observeOn(ioScheduler)
 
+    /**
+     * Writes data to bluetooth connection
+     * @param message data to write
+     */
     fun write(message: ByteArray) {
         var bytesWritten = 0L
         message.usePinned {
@@ -87,10 +109,18 @@ class BluetoothConnection(
         if (bytesWritten < 0) throw BluetoothConnectionClosedException("Trying to write to closed connection")
     }
 
+    /**
+     * Writes string data to bluetooth connection
+     * @param message data to send
+     */
     fun writeString(message: String) {
         write(message = "$message \n".encodeToByteArray())
     }
 
+    /**
+     * Writes message to bluetooth connection
+     * @param message message to send
+     */
     fun sendMessage(message: IBluetoothMessage) {
         writeString(serializer.encodeToString(PolymorphicSerializer(IBluetoothMessage::class), message))
     }

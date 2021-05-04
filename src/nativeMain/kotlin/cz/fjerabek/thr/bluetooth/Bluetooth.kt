@@ -17,7 +17,6 @@ class BluetoothConnectionClosedException(message: String) : BluetoothException(m
 @ExperimentalUnsignedTypes
 /**
  * Bluetooth class implementing BlueZ DBus api
- * @param connectionCallback callback method. Called when connection is accepted
  */
 object Bluetooth {
     const val BLUEZ_BUS_NAME = "org.bluez"

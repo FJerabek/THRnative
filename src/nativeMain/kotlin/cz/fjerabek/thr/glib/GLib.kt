@@ -8,12 +8,46 @@ import glib.*
 import kotlinx.cinterop.*
 
 
+/**
+ * Glib exception
+ * @param message exception message
+ */
 open class GLibException(message: String) : Exception(message)
+
+/**
+ * Exception when registering object into DBUS
+ * @param message exception message
+ */
 class GLibObjectRegisterException(message: String) : GLibException(message)
+
+/**
+ * Exception when variant has unsupported data type
+ * @param message exception message
+ */
 class GLibVariantUnsupportedData(message: String) : GLibException(message)
+
+/**
+ * Exception when requested parameter does not exist on object
+ * @param message exception message
+ */
 class GLibParameterException(message: String) : GLibException(message)
+
+/**
+ * Exception when creating node from xml
+ * @param message exception message
+ */
 class GLibInterfaceInfoException(message: String): GLibException(message)
+
+/**
+ * Exception when calling dbus method
+ * @param message exception message
+ */
 class GLibMethodCallException(message: String): GLibException(message)
+
+/**
+ * Exception when dbus method call is received with unknown method name
+ * @param message exception message
+ */
 class DBusUnknownMethodException(message: String): GLibException(message)
 
 /**

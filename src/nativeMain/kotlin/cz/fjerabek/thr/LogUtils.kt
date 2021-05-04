@@ -1,31 +1,21 @@
 package cz.fjerabek.thr
 
-import com.badoo.reaktive.scheduler.singleScheduler
-import com.badoo.reaktive.scheduler.submit
 import kotlinx.cinterop.*
 import platform.posix.*
+import kotlin.native.concurrent.AtomicReference
 
 object LogUtils {
-    private const val ANSI_ESCAPE = "\u001b["
-    private const val ANSI_RESET = "\u001b[0m"
-
-    enum class ANSIColor(val ansi: Int) {
-        RED(31),
-        GREEN(32),
-        WHITE(37),
-        YELLOW(33)
-    }
-
-    enum class LogLevel(private val color: ANSIColor? = null) {
+    enum class LogLevel(private val color: ANSIColor) {
         DEBUG(ANSIColor.WHITE),
         INFO(ANSIColor.GREEN),
         WARN(ANSIColor.YELLOW),
         ERROR(ANSIColor.RED);
 
         override fun toString(): String {
-            return this.color?.let { color(it) { super.toString() } } ?: super.toString()
+            return super.toString().color(color);
         }
     }
+     var logLevel = AtomicReference(LogLevel.INFO)
 
     fun debug(message: () -> Any) {
         logAsync(LogLevel.DEBUG, message().toString())
@@ -66,6 +56,7 @@ object LogUtils {
     }
 
     private fun log(level: LogLevel, message: String) {
+        if(logLevel.value > level) return
         val timeString = ByteArray(9)
         val indentedMessage = message.replace("\n", "\n\t\t\t")
         memScoped {
@@ -78,6 +69,5 @@ object LogUtils {
         println("${timeString.toKString()}\t[$level]\t${indentedMessage}")
     }
 
-    private fun color(color: ANSIColor, string: () -> String) = "$ANSI_ESCAPE${color.ansi}m${string()}$ANSI_RESET"
 }
 

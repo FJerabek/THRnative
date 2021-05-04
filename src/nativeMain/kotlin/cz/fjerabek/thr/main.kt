@@ -8,6 +8,7 @@ import com.badoo.reaktive.observable.subscribe
 import com.badoo.reaktive.observable.subscribeOn
 import com.badoo.reaktive.scheduler.ioScheduler
 import com.badoo.reaktive.scheduler.mainScheduler
+import com.badoo.reaktive.utils.atomic.AtomicBoolean
 import com.badoo.reaktive.utils.atomic.AtomicLong
 import com.badoo.reaktive.utils.atomic.AtomicReference
 import com.badoo.reaktive.utils.atomic.update
@@ -16,6 +17,7 @@ import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.LogUtils.info
 import cz.fjerabek.thr.LogUtils.warn
 import cz.fjerabek.thr.bluetooth.*
+import cz.fjerabek.thr.cli.*
 import cz.fjerabek.thr.data.bluetooth.*
 import cz.fjerabek.thr.file.PresetsManager
 import cz.fjerabek.thr.midi.Midi
@@ -64,10 +66,15 @@ val leftButtonTimeoutId = AtomicLong(-1)
 @SharedImmutable
 val rightButtonTimeoutId = AtomicLong(-1)
 
+@SharedImmutable
+val isCliRq = AtomicBoolean(false)
+
 @ExperimentalUnsignedTypes
 fun ByteArray.toHexString() = asUByteArray().joinToString(" ") { it.toString(16).padStart(2, '0') }
 
 val mainLoop = g_main_loop_new(null, 0)
+
+const val PRESETS_DEFAULT = "presets.json"
 
 /**
  * Called on midi message receive
@@ -107,7 +114,7 @@ fun onMidiError(throwable: Throwable) {
 }
 
 /**
- * Starts connecting to THR midi device. Blocks current thread if not connected
+ * Starts connecting to THR midi device.
  */
 fun midiConnect(port: String) {
     observable<Midi> {
@@ -183,6 +190,7 @@ fun bluetoothMessage(message: IBluetoothMessage) {
                 }
                 else -> {
                     midi.value?.sendMessage(presets.value[message.index])
+                    currentPreset.value = message.index
                 }
             }
         }
@@ -212,11 +220,9 @@ fun uartMessageReceived(message: UartMessage) {
                 when (message.id) {
                     1 -> { //Left button
                         val leftButtonTimeout = staticCFunction<gpointer?, gboolean> {
-                            "Left button long press".debug()
                             leftButtonTimeoutId.value = -1
                             0 //Return false so the timeout is not scheduled anymore
                         }
-                        "Left button pressed setting timeout".debug()
                         leftButtonTimeoutId.value = g_timeout_add(3000, leftButtonTimeout, null).toLong()
 
                         if (currentPreset.value == -1 || currentPreset.value <= 0) {
@@ -227,7 +233,6 @@ fun uartMessageReceived(message: UartMessage) {
                     }
                     2 -> { //Right button
                         val rightButtonTimeout = staticCFunction<gpointer?, gboolean> {
-                            "Right button long press".debug()
 
                             "Setting Bluetooth to discoverable and pairable".info()
                             BluetoothAdapter.discoverable = true
@@ -235,7 +240,6 @@ fun uartMessageReceived(message: UartMessage) {
                             rightButtonTimeoutId.value = -1
                             0 //Return false so the timeout is not scheduled anymore
                         }
-                        "Right button pressed setting timeout".debug()
                         rightButtonTimeoutId.value = g_timeout_add(3000, rightButtonTimeout, null).toLong()
 
                         if (currentPreset.value == -1 || currentPreset.value + 1 >= presets.value.size) {
@@ -265,10 +269,21 @@ fun uartMessageReceived(message: UartMessage) {
             }
         }
         is FWVersionMessage -> {
-            bluetoothConnection.value?.sendMessage(message)
+            if (isCliRq.value) {
+                isCliRq.value = false
+                println(message)
+            } else {
+                bluetoothConnection.value?.sendMessage(message)
+            }
         }
-        is StatusMessage ->
-            bluetoothConnection.value?.sendMessage(message)
+        is StatusMessage -> {
+            if (isCliRq.value) {
+                isCliRq.value = false
+                println(message)
+            } else {
+                bluetoothConnection.value?.sendMessage(message)
+            }
+        }
 
         is ShutdownMessage -> {
             "Shutting down".warn()
@@ -294,15 +309,77 @@ fun setupUartReceiver() {
         })
 }
 
+/**
+ * Processes cli command
+ */
+fun cliCommandProcessor(command: CliCommand) {
+    when (command) {
+        is HelpCommand -> {
+            println(
+                "Command line interface is useful for getting basic information from THR-comm. Commands are: \n" +
+                        "help, h\t\tPrints this text \n" +
+                        "status\t\tPrints system status (uptime, battery %, charging state, current in mA) \n" +
+                        "version\t\tPrints current FW version \n" +
+                        "shutdown\tShuts down system \n" +
+                        "activeIndex, ai\tPrints active preset index"
+            )
+        }
+        is CurrentCommand -> {
+            isCliRq.value = true
+            Uart.requestStatus()
+        }
+        is VersionCommand -> {
+            isCliRq.value = true
+            Uart.requestFirmware()
+        }
+        is ShutdownCommand -> {
+            Uart.requestShutdown()
+        }
+        is GetActivePresetIndexCommand -> {
+            println(currentPreset.value)
+        }
+    }
+}
+
 
 @ExperimentalSerializationApi
 @ExperimentalUnsignedTypes
 fun main(args: Array<String>) {
-    if (args.isEmpty()) {
-        println("Needed path to midi device")
+    val argParser = ArgParser(args)
+    val help: Boolean by argParser.option(ArgType.BOOLEAN, 'h', "help", "shows this text")
+    val midiPortFile: String by argParser.option(ArgType.STRING, 'f', "midiFile", "dev file usually /dev/midi1", true)
+    val disableUart: Boolean by argParser.option(ArgType.BOOLEAN, null, "disableUart", "disables UART communication")
+    val disableHb: Boolean by argParser.option(ArgType.BOOLEAN, null, "disableHeartBeat", "disables sending HeartBeat")
+    val enableConsole: Boolean by argParser.option(ArgType.BOOLEAN, 'c', "console", "enables development console")
+    val presetsFile: String by argParser.option(ArgType.STRING, 'p', "presetFile", "specifies presets file default is $PRESETS_DEFAULT")
+    val debug: Boolean by argParser.option(ArgType.BOOLEAN, 'd', "debug", "enables debug log output")
+
+    if(help) {
+        argParser.printHelp("THR-comm", "Communicate with THR 10 guitar combo and mobile configuration app")
         return
     }
-    midiPort.value = args[0]
+
+    try {
+        argParser.inject()
+    } catch (e : Exception) {
+        println("Invalid parameters try flag -h or --help for more info")
+        exit(1)
+    }
+
+    if(debug) {
+        LogUtils.logLevel.value = LogUtils.LogLevel.DEBUG
+    }
+
+    presetsFilePath.value = presetsFile.ifEmpty { PRESETS_DEFAULT }
+    midiPort.value = midiPortFile
+
+    """
+        midiFile: $midiPortFile,
+        disableUart: $disableUart,
+        disableHb: $disableHb,
+        enableConsole: $enableConsole,
+        presetsFile: $presetsFile
+    """.trimIndent().debug()
 
     signal(SIGINT, staticCFunction<Int, Unit> {
         Uart.close()
@@ -326,8 +403,14 @@ fun main(args: Array<String>) {
 
     "Starting MIDI connector".info()
     midiConnect(midiPort.value)
-    "Setting up UART receiver".info()
-    setupUartReceiver()
+
+    if(disableUart) {
+        "UART receiver disabled".warn()
+    } else {
+        "Setting up UART receiver".info()
+        setupUartReceiver()
+    }
+
     "Registering Bluetooth SDP record".info()
     Bluetooth.sdpRegister() //Starts accepting connections
     "Registering Bluetooth agent".info()
@@ -341,7 +424,20 @@ fun main(args: Array<String>) {
         }
         1
     }
-//    g_timeout_add(1000, heartbeat, null)
+
+    if(disableHb || disableUart){
+        "Heartbeat sender is disabled".warn()
+    } else {
+        "Starting heartbeat sender".info()
+        g_timeout_add(1000, heartbeat, null)
+    }
+
+    if (enableConsole) {
+        "Console enabled".info()
+        Console.runConsole()
+            .subscribeOn(ioScheduler)
+            .subscribe(onNext = ::cliCommandProcessor)
+    }
 
     "Starting main loop".info()
     g_main_loop_run(mainLoop)

@@ -15,12 +15,23 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.usePinned
 import platform.posix.*
 
+/**
+ * Exception thrown when midi device is disconnected
+ * @param message exception message
+ */
 class MidiDisconnectedException(message: String) : Exception(message)
+
+/**
+ * Exception when midi receives unknown message
+ * @param message exception message
+ */
 class MidiUnknownMessageException(message: String) : Exception(message)
 
+/**
+ * Class representing midi device
+ * @param port midi /dev file for communication
+ */
 class Midi(port: String) {
-    @ExperimentalUnsignedTypes // just to make it clear that the experimental unsigned types are used
-    fun ByteArray.toHexString() = asUByteArray().joinToString(" ") { it.toString(16).padStart(2, '0') }
 
     init {
         if (access(port, F_OK) != 0) {
@@ -31,6 +42,11 @@ class Midi(port: String) {
     private val read: CPointer<FILE>? = fopen(port, "rb")
     private val write: CPointer<FILE>? = fopen(port, "wb")
 
+    /**
+     * Reads message from midi
+     * @throws MidiDisconnectedException when trying to read from disconnected device
+     * @return Read message
+     */
     private fun readMessage(): IMidiMessage {
         var messageStart = false
         val data = arrayListOf<Byte>()
@@ -41,7 +57,6 @@ class Midi(port: String) {
                     throw MidiDisconnectedException("Reading from closed stream")
                 }
             } while (byte != 0xF0)
-//            data.add(0xF0.toByte())
             messageStart = true
         }
 
@@ -56,6 +71,10 @@ class Midi(port: String) {
         return createMessage(data.toByteArray()) ?: throw MidiUnknownMessageException("Invalid message received")
     }
 
+    /**
+     * Creates correct message type from byte array data
+     * @return created message
+     */
     private fun createMessage(data: ByteArray): IMidiMessage? {
         return when {
             data contentEquals HeartBeatMessage.heartbeatData -> {
@@ -73,6 +92,10 @@ class Midi(port: String) {
         }
     }
 
+    /**
+     * Starts midi message receiver
+     * @return Observable called when new midi message is received
+     */
     fun startMessageReceiver() = observable<IMidiMessage> {
         while (true) {
             try {
@@ -83,6 +106,10 @@ class Midi(port: String) {
         }
     }.observeOn(newThreadScheduler)
 
+    /**
+     * Sends data to midi device
+     * @param data data to send
+     */
     private fun send(data: ByteArray) {
         val midiData = byteArrayOf(0xF0.toByte()) + data + byteArrayOf(0xF7.toByte())
         midiData.usePinned {
@@ -94,11 +121,18 @@ class Midi(port: String) {
         }
     }
 
+    /**
+     * Sends midi message to device
+     * @param message midi message to send
+     */
     @ExperimentalUnsignedTypes
     fun sendMessage(message: IMidiMessage) {
         send(message.sysex)
     }
 
+    /**
+     * Sends dump request to midi device
+     */
     fun requestDump() {
         val dumpCommand = byteArrayOf(
             0x43, 0x7D, 0x20, 0x44, 0x54, 0x41, 0x31, 0x41, 0x6C, 0x6C, 0x50,
@@ -106,16 +140,25 @@ class Midi(port: String) {
         send(dumpCommand)
     }
 
+    /**
+     * Sends lamp settings to device
+     */
     fun lamp(on: Boolean) {
         val lamp = byteArrayOf(0xF0.toByte(), 0x43, 0x7D, 0x30, 0x41, 0x30, 0x01, if(on) 0x00 else 0x01, 0xF7.toByte())
         send(lamp)
     }
 
+    /**
+     * Sends wide stereo settings to device
+     */
     fun wideStereo(on: Boolean) {
         val wideStereo = byteArrayOf(0xF0.toByte(), 0x43, 0x7D, 0x30, 0x41, 0x30, 0x00, if(on) 0x00 else 0x01, 0xF7.toByte())
         send(wideStereo)
     }
 
+    /**
+     * Closes all connection to device
+     */
     fun close() {
         fclose(read)
         fclose(write)
@@ -144,6 +187,11 @@ class Midi(port: String) {
         private val changePrefix = byteArrayOf(0x43, 0x7D, 0x10, 0x41, 0x30, 0x01)
         const val DISCOVERY_DELAY = 1u
 
+        /**
+         * Blocks the thread until midi connection is available
+         * @param port path to midi /dev file
+         * @return midi connection
+         */
         fun waitForConnection(port: String): Midi {
             while (true) {
                 kotlin.runCatching {

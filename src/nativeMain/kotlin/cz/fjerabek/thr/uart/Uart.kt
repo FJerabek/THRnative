@@ -5,6 +5,7 @@ import com.badoo.reaktive.observable.observeOn
 import com.badoo.reaktive.scheduler.ioScheduler
 import com.badoo.reaktive.utils.atomic.AtomicReference
 import com.badoo.reaktive.utils.atomic.getAndUpdate
+import cz.fjerabek.thr.LogUtils.debug
 import termios.setupSerial
 import cz.fjerabek.thr.LogUtils.error
 import cz.fjerabek.thr.data.uart.*
@@ -12,14 +13,33 @@ import glib.*
 import kotlinx.cinterop.*
 import platform.posix.*
 
+/**
+ * Generic uart Exception
+ * @param message exception message
+ */
 open class UartException(message: String) : Exception(message)
+
+/**
+ * Error writing to uart
+ * @param message exception message
+ */
 class UartWriteException(message: String) : UartException(message)
+
+/**
+ * Error reading message from uart
+ * @param message exception message
+ */
 class UartReadException(message: String) : UartException(message)
 
 @SharedImmutable
 val uartQueue = AtomicReference<List<String>>(listOf())
 
 
+/**
+ * Creates uart message from string represetnation
+ * @param string string representation of message
+ * @return Uart message from string representation
+ */
 fun UartMessage.Companion.fromString(string: String): UartMessage {
     val params = string.split(";")
 
@@ -69,25 +89,31 @@ fun UartMessage.Companion.fromString(string: String): UartMessage {
     }
 }
 
+/**
+ * Object representing uart port
+ */
 object Uart {
     private const val UART_FILE = "/dev/ttyS0"
     private var uart: CPointer<GIOChannel>?
-    private val fd: Int
+    private val fd: Int = open(UART_FILE, O_RDWR or O_NOCTTY or O_SYNC)
 
     init {
-//        "Opening UART serial".debug()
-        fd = open(UART_FILE, O_RDWR or O_NOCTTY or O_SYNC)
+        "Opening UART serial".debug()
         if (fd == -1) {
             "Error uart opening failed: ${strerror(errno)}".error()
             uart = null
         } else {
-//            "Serial opened fd: $fd".debug()
+            "Serial opened fd: $fd".debug()
             setupSerial(fd)
             uart = g_io_channel_unix_new(fd)
 //        g_io_channel_set_buffered(uart, 1/*true*/)
         }
     }
 
+    /**
+     * Writes string to UART
+     * @param string message to write
+     */
     private fun writeString(message: String): Int = memScoped {
         val buffer = message.encodeToByteArray()
         var written = -1;
@@ -104,6 +130,10 @@ object Uart {
 
     }
 
+    /**
+     * Starts uart message receiver
+     * @return observable which is called when new message is received
+     */
     fun startReceiver() = observable<UartMessage> { observable ->
         if (uart == null) {
             throw UartException("UART not initialized cannot start receiver")
@@ -133,6 +163,9 @@ object Uart {
         }
     }.observeOn(ioScheduler)
 
+    /**
+     * Sends firmware request message to uart device
+     */
     fun requestFirmware() {
         uartQueue.getAndUpdate {
             it.toMutableList().apply { add(UartMessage.CMD_FW) }
@@ -140,6 +173,9 @@ object Uart {
         writeString(UartMessage.CMD_FW)
     }
 
+    /**
+     * Sends status request message to uart device
+     */
     fun requestStatus() {
         uartQueue.getAndUpdate {
             it.toMutableList().apply { add(UartMessage.CMD_STATUS) }
@@ -147,6 +183,9 @@ object Uart {
         writeString(UartMessage.CMD_STATUS)
     }
 
+    /**
+     * Sends heart beat message to uart device
+     */
     fun sendHeartBeat() {
         uartQueue.getAndUpdate {
             it.toMutableList().apply { add(UartMessage.CMD_HBT) }
@@ -154,6 +193,9 @@ object Uart {
         writeString(UartMessage.CMD_HBT)
     }
 
+    /**
+     * Sends shutdown request to uart device
+     */
     fun requestShutdown() {
         uartQueue.getAndUpdate {
             it.toMutableList().apply { add(UartMessage.CMD_SHUTDOWN) }
@@ -161,6 +203,9 @@ object Uart {
         writeString(UartMessage.CMD_SHUTDOWN)
     }
 
+    /**
+     * Closes uart connection
+     */
     fun close() {
         uart?.let {
             g_io_channel_close(uart)

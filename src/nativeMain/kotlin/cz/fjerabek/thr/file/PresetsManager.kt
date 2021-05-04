@@ -9,8 +9,16 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import platform.posix.*
 
+/**
+ * Object responsible for loading and saving presets
+ */
 object PresetsManager {
 
+    /**
+     * Saves presets to file
+     * @param presetFilePath file path for saving
+     * @param presets presets to save
+     */
     fun savePresets(presetFilePath: String, presets: List<PresetMessage>) {
         val file = fopen(presetFilePath, "wb")
         if (file == null) {
@@ -22,6 +30,11 @@ object PresetsManager {
         }
     }
 
+    /**
+     * Loads presets from file
+     * @param presetFilePath file to load
+     * @return loaded presets
+     */
     fun loadPresets(presetFilePath: String): List<PresetMessage>? {
         val file = fopen(presetFilePath, "rb")
         if (file == null) {

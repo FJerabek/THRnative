@@ -8,6 +8,9 @@ import glib.*
 import kotlinx.cinterop.*
 import platform.posix.uint32_t
 
+/**
+ * Object representing pin agent without need of pin authentication.
+ */
 object PinAgent {
     private const val AGENT_DBUS_PATH = "/cz/fjerabek/thr/agent"
     private const val DBUS_AGENT_OBJECT_DESCRIPTION =
@@ -90,6 +93,11 @@ object PinAgent {
         }
     }
 
+    /**
+     * Method called when authorization is needed
+     * @param device device name
+     * @param invocation dbus invocation. For authentication return value to null is needed
+     */
     private fun requestAuthorization(device: String, invocation: CPointer<GDBusMethodInvocation>?) {
         """
             RequestAuthorization
@@ -100,6 +108,9 @@ object PinAgent {
         BluetoothAdapter.discoverable = false
     }
 
+    /**
+     * Register pin agent object to dbus system
+     */
     fun registerAgent() {
         val vTable = cValue<GDBusInterfaceVTable> {
             method_call = connectionMethodCall
