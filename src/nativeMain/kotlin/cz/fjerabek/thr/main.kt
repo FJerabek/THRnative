@@ -154,6 +154,7 @@ fun midiConnect(port: String) {
         .subscribe {
             midi.value = it
             bluetoothConnection.value?.sendMessage(Connected(true))
+            it.requestDump()
             it.startMessageReceiver()
                 .subscribeOn(mainScheduler)
                 .subscribe(onError = ::onMidiError, onNext = ::onMidiMessage)
