@@ -181,7 +181,7 @@ class ArgParser(private val args: Array<String>) {
             builder.append(
                 "--${it.longName.padEnd(20, ' ')}"
             )
-            builder.append(if (it.required) "required" else "".padEnd(8, ' '))
+            builder.append(if (it.required) "required " else "".padEnd(9, ' '))
             builder.appendLine(it.description)
         }
         println(builder)

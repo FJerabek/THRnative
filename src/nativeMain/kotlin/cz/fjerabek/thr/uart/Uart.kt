@@ -83,6 +83,9 @@ fun UartMessage.Companion.fromString(string: String): UartMessage {
                 }
             }
         }
+        "\$off" -> {
+            return ShutdownMessage(true)
+        }
         else -> {
             throw UnsupportedOperationException("Received invalid message: $params")
         }

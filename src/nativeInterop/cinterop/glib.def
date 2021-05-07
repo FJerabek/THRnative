@@ -1,9 +1,7 @@
 headers = gio/gio.h glib.h gio/gunixfdlist.h
 
-compilerOpts.linux_arm32_hfp = -I/home/fjerabek/IdeaProjects/THRnative/src/nativeInterop/armhf_libs/glib/glib-2.0 \
--I/home/fjerabek/IdeaProjects/THRnative/src/nativeInterop/armhf_libs/glib/include -I/usr/include/gio-unix-2.0
+compilerOpts.linux_arm32_hfp = -Isrc/nativeInterop/armhf_libs/glib/glib-2.0 \
+ -Isrc/nativeInterop/armhf_libs/glib/include -Isrc/nativeInterop/armhf_libs/glib/gio-unix-2.0
 compilerOpts.linux_x64 = -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/include/gio-unix-2.0
-linkerOpts.linux_arm32_hfp = -L /home/fjerabek/IdeaProjects/THRnative/src/nativeInterop/armhf_libs/glib -lglib-2.0 -lgio-2.0
-linkerOpts.linux_x64 = -L /usr/lib/x86_64-linux-gnu -lglib-2.0 -lgio-2.0
-
-#Todo: Convert absolute path to project relative path
+linkerOpts.linux_arm32_hfp = -L src/nativeInterop/armhf_libs/glib -lglib-2.0 -lgio-2.0 -rpath src/nativeInterop/armhf_libs/glib
+linkerOpts.linux_x64 = -L /usr/lib/x86_64-linux-gnu -lglib-2.0 -lgio-2.0 -lgobject-2.0

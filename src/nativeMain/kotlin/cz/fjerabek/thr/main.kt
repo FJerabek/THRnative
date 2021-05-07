@@ -389,7 +389,7 @@ fun cliCommandProcessor(command: CliCommand) {
 fun main(args: Array<String>) {
     val argParser = ArgParser(args)
     val help: Boolean by argParser.option(ArgType.BOOLEAN, 'h', "help", "shows this text")
-    val midiPortFile: String by argParser.option(ArgType.STRING, 'f', "midiFile", "dev file usually /dev/midi1", true)
+    val midiPortFile: String by argParser.option(ArgType.STRING, 'm', "midiFile", "dev file usually /dev/midi1", true)
     val disableUart: Boolean by argParser.option(ArgType.BOOLEAN, null, "disableUart", "disables UART communication")
     val disableHb: Boolean by argParser.option(ArgType.BOOLEAN, null, "disableHeartBeat", "disables sending HeartBeat")
     val enableConsole: Boolean by argParser.option(ArgType.BOOLEAN, 'c', "console", "enables development console")
