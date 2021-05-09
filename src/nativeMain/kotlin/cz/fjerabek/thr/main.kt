@@ -287,6 +287,7 @@ fun uartMessageReceived(message: UartMessage) {
                     }
                 }
                 try {
+                    if(!presets.value.indices.contains(currentPreset.value)) return
                     midi.value?.sendMessage(presets.value[currentPreset.value])
                     bluetoothConnection.value?.sendMessage(PresetSelect(currentPreset.value))
                 } catch (e: MidiDisconnectedException) {
